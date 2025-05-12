@@ -1,1 +1,1 @@
-added docs and messages in gitignore
+try: remove .txt
