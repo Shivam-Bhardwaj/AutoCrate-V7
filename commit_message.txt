@@ -1,7 +1,5 @@
-Feat: Initialize project structure and automate commits
+Style: Update .gitignore to exclude all NX binary files
 
-- Add .gitignore for project file filtering.
-- Add README.md with project overview and goals.
-- Add CHANGELOG.md for tracking project development.
-- Add commit_message.txt for sourcing commit messages.
-- Update push_changes.bat to read commit messages from commit_message.txt.
+- Added patterns to ignore .prt, .asm, .drw and related NX files
+  to prevent proprietary CAD data from being committed.
+- This means NX template files will be managed locally and not versioned.
