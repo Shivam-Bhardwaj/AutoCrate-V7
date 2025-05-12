@@ -1,0 +1,7 @@
+Feat: Initialize project structure and automate commits
+
+- Add .gitignore for project file filtering.
+- Add README.md with project overview and goals.
+- Add CHANGELOG.md for tracking project development.
+- Add commit_message.txt for sourcing commit messages.
+- Update push_changes.bat to read commit messages from commit_message.txt.
