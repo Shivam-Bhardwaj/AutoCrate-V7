@@ -1,5 +1,1 @@
-Style: Update .gitignore to exclude all NX binary files
-
-- Added patterns to ignore .prt, .asm, .drw and related NX files
-  to prevent proprietary CAD data from being committed.
-- This means NX template files will be managed locally and not versioned.
+added docs and messages in gitignore
