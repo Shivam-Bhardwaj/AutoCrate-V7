@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+pip-freeze.txt
+pip-requirements.txt
+*.egg-info/
+.ipynb_checkpoints
+
+# Siemens NX
+*.log
+*.syslog
+# Add any other NX-specific temporary files or backup files you notice
+# For example, if NX creates backup files like .prt~ or .bak
+# *.~prt
+# *.bak
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# OS specific
+.DS_Store
+Thumbs.db
