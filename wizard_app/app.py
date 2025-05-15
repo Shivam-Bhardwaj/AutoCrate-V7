@@ -277,7 +277,7 @@ skid_results_for_processing = {}
 if skid_logic: 
     skid_results_for_processing = skid_logic.calculate_skid_layout(
         product_weight=current_ui_parameters['product_weight'],
-        product_width=current_ui_parameters['product_width'],
+        product_width=current_ui_parameters['product_width'], # type: ignore
         clearance_side=current_ui_parameters['clearance_side'],
         panel_thickness=current_ui_parameters['panel_thickness'],
         cleat_thickness=current_ui_parameters['wall_cleat_thickness'] 

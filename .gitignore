@@ -59,3 +59,7 @@ Thumbs.db
 docs/
 build/
 dist/
+.venv/
+.mypy_cache/
+.pytest_cache/
+.coverage
