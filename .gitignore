@@ -56,5 +56,6 @@ Thumbs.db
 # !nx_templates/*.prt 
 # (But based on your request, you want all NX files ignored, so the above lines would be commented out or omitted)
 
-nx_part_templates/
 docs/
+build/
+dist/
