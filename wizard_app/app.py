@@ -2,13 +2,14 @@
 # VERSION: Meeting Mode - Full Skid & Floorboard .exp for N-Instance Strategy (All Corrected)
 
 import sys
-import os
-import logging
-import math 
-import streamlit as st
-import pandas as pd 
-import json
-import datetime
+import os, logging, math, json, datetime
+
+try:
+    import streamlit as st
+    import pandas as pd
+except ImportError as e:
+    print(f"Error importing required libraries: {e}. Ensure 'streamlit' and 'pandas' are installed.")
+    sys.exit(1)
 
 # --- Path Setup ---
 if __name__ == "__main__" and __package__ is None:
