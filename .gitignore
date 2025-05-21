@@ -63,6 +63,6 @@ dist/
 .mypy_cache/
 .pytest_cache/
 .coverage
-nx_part_template/
-wizard_app\__pycache__
 
+wizard_app\__pycache__
+nx_part_templates
