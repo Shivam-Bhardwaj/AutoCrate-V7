@@ -1,0 +1,76 @@
+NX QUICK REFERENCE: LINKING FLOORBOARD INSTANCES (N-Instance Strategy)
+=======================================================================
+
+**Objective:** Parametrically control pre-placed instances of `FLOORBOARD_LUMBER_TEMPLATE.prt`
+within your NX assembly (e.g., `BASE_ASSY_TEMPLATE.prt`) using expressions from the
+imported `AutoCrate_Expressions.exp` file.
+
+**Part Origin Assumption:** The origin of `FLOORBOARD_LUMBER_TEMPLATE.prt` is at the
+**center of its bottom face**.
+
+**Key Assembly-Level Expressions (from imported .exp file):**
+-------------------------------------------------------------
+(Ensure these are present in the expressions list of the assembly containing the floorboards)
+
+* `CALC_Floor_Board_Length_Across_Skids` (This is the X-length for all floorboards)
+* `INPUT_Floorboard_Actual_Thickness` (This is the Z-thickness for all floorboards)
+* `INPUT_Skid_Nominal_Height` (Used for Z-positioning floorboards on top of skids)
+
+*For EACH floorboard "slot" you have pre-placed (e.g., for slot `FB_Std_Front_1`):*
+* `FB_Std_Front_1_Suppress_Flag` (0 = Show/Unsuppressed, 1 = Hide/Suppressed)
+* `FB_Std_Front_1_Actual_Width` (The Y-dimension for THIS specific board slot)
+* `FB_Std_Front_1_Y_Pos_Abs` (Absolute Y-coordinate of the *leading edge* of THIS slot)
+
+(Similar expressions exist for `FB_Std_Front_2_...`, `FB_Std_Back_1_...`, `FB_Custom_...`)
+
+----------------------------------------------------------------------------------
+Linking a Pre-Placed Instance (Example: `FB_STD_FRONT_1_INSTANCE_IN_NX`)
+----------------------------------------------------------------------------------
+Select the instance in the Assembly Navigator, then access its instance expressions.
+
+**1. Link Dimensions:**
+   * Instance's `INPUT_Floorboard_Length_X` (Formula) = `CALC_Floor_Board_Length_Across_Skids`
+   * Instance's `INPUT_Floorboard_Width_Y` (Formula)  = `FB_Std_Front_1_Actual_Width`
+   * Instance's `INPUT_Floorboard_Thickness_Z` (Formula) = `INPUT_Floorboard_Actual_Thickness`
+
+**2. Link Position (using Assembly Constraints for the instance's origin):**
+   * **X-Coordinate of Origin:** Constrain to `0`
+     (This centers the board if the assembly's YZ plane is the crate's centerline)
+   * **Z-Coordinate of Origin:** Constrain to `INPUT_Skid_Nominal_Height`
+     (This places the bottom face of the floorboard on top of the skids)
+   * **Y-Coordinate of Origin:** Constrain using the formula:
+     `FB_Std_Front_1_Y_Pos_Abs + (FB_Std_Front_1_Actual_Width / 2)`
+     (This positions the center of the board correctly, as `_Y_Pos_Abs` is its leading edge)
+
+**3. Link Suppression State:**
+   * Link the instance's suppression control to an expression.
+   * If NX suppression uses `0`=Suppressed and `1`=Unsuppressed (opposite of our flag):
+     The driving expression for suppression should be: `1 - FB_Std_Front_1_Suppress_Flag`
+   * If NX suppression uses `0`=Unsuppressed and `1`=Suppressed (same as our flag):
+     The driving expression for suppression should be: `FB_Std_Front_1_Suppress_Flag`
+
+----------------------------------------------------------------------------------
+Repeat for Other Pre-Placed Instances:
+----------------------------------------------------------------------------------
+
+* **For instance `FB_STD_FRONT_2_INSTANCE_IN_NX`:**
+    * `INPUT_Floorboard_Width_Y` = `FB_Std_Front_2_Actual_Width`
+    * Y-Origin Constraint: `FB_Std_Front_2_Y_Pos_Abs + (FB_Std_Front_2_Actual_Width / 2)`
+    * Suppression Link: `1 - FB_Std_Front_2_Suppress_Flag` (or direct flag)
+    * (Length_X and Thickness_Z links remain the same as for Front_1)
+
+* **For instance `FB_STD_BACK_1_INSTANCE_IN_NX`:**
+    * `INPUT_Floorboard_Width_Y` = `FB_Std_Back_1_Actual_Width`
+    * Y-Origin Constraint: `FB_Std_Back_1_Y_Pos_Abs + (FB_Std_Back_1_Actual_Width / 2)`
+    * Suppression Link: `1 - FB_Std_Back_1_Suppress_Flag` (or direct flag)
+
+* **For instance `FB_CUSTOM_MIDDLE_1_INSTANCE_IN_NX`:**
+    * `INPUT_Floorboard_Width_Y` = `FB_Custom_Actual_Width`
+    * Y-Origin Constraint: `FB_Custom_Y_Pos_Abs + (FB_Custom_Actual_Width / 2)`
+    * Suppression Link: `1 - FB_Custom_Suppress_Flag` (or direct flag)
+
+...and so on for all your pre-placed floorboard slots (up to 10 front, 10 back).
+
+----------------------------------------------------------------------------------
+**Final Check:**
+After linking, change a "USER CONTROL" in the top-level assembly expressions (e.g., `product_length` or `chosen_standard_floorboard_nominal` by re-running Streamlit and re-importing the .exp). Update the NX model. The floorboards should change size, position, and some should appear/disappear based on the updated expression values.

@@ -1,0 +1,44 @@
+# Subject line (try to keep under 50 characters)
+# --- COMMIT TYPE ---
+# feat: (new feature for the user, not a new feature for build script)
+# fix: (bug fix for the user, not a fix to a build script)
+# docs: (changes to the documentation)
+# style: (formatting, missing semi colons, etc; no production code change)
+# refactor: (refactoring production code, eg. renaming a variable)
+# test: (adding missing tests, refactoring tests; no production code change)
+# chore: (updating grunt tasks etc; no production code change)
+# perf: (performance improvements)
+# build: (changes that affect the build system or external dependencies)
+# ci: (changes to CI configuration files and scripts)
+# revert: (reverts a previous commit)
+
+# --- SCOPE (Optional) ---
+# Optionally, include a scope in parentheses after the type, e.g., feat(parser): 
+# Or feat(simple_new_tab): 
+
+# --- SUBJECT ---
+# Imperative mood, present tense: "change" not "changed" nor "changes"
+# No capitalization at the start, no dot (.) at the end
+
+
+# --- BODY (Optional) ---
+# Just as in the subject, use the imperative, present tense: "change" not "changed" nor "changes".
+# The body should include the motivation for the change and contrast this with previous behavior.
+# More detailed explanatory text, if necessary. Wrap it to about 72 characters or so.
+# Further paragraphs come after blank lines.
+#
+# - Bullet points are okay, too
+# - Typically a hyphen or asterisk is used for the bullet, preceded by a single space,
+#   with blank lines in between, but conventions vary.
+
+
+# --- FOOTER (Optional) ---
+# Breaking changes: Start with "BREAKING CHANGE:" (with a space after the colon).
+# The rest of the commit message is then the description of the change, the justification,
+# and migration notes.
+#
+# Referencing issues:
+# Closes #123
+# Refs #456, #789
+# See also #101112
+
