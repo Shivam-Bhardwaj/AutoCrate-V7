@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoCrate Application Development Plan</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; background-color: #f4f4f4; color: #333; }
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2, h3 { color: #333; border-bottom: 1px solid #eee; padding-bottom: 10px;}
+        h1 { font-size: 2em; }
+        h2 { font-size: 1.5em; margin-top: 30px; }
+        h3 { font-size: 1.2em; margin-top: 20px; }
+        ul { list-style-type: disc; margin-left: 20px; }
+        li { margin-bottom: 8px; }
+        strong { color: #555; }
+        .note { background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 10px; margin: 15px 0; }
+        .user-action { background-color: #e2f3ff; border-left: 4px solid #007bff; padding: 10px; margin: 15px 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f0f0f0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AutoCrate Application - Development Plan</h1>
+        <p><strong>Objective:</strong> Develop a PyQt6 application to automate the design of shipping crates and generate Siemens NX Expression Files (.exp) based on internal design standards and practices.</p>
+        <p><strong>Source Documents for Detailed Logic (User to Review):</strong></p>
+        <ul>
+            <li>0205-13057_01.pdf</li>
+            <li>0205-13058_01.pdf</li>
+            <li>0205-13059_03.pdf</li>
+            <li>0250-00098 rev 10.pdf (likely a primary specification document)</li>
+            <li>0251-70054 (1) stencils.pdf (and its duplicate)</li>
+            <li>The new coordinate system and orientation.pptx</li>
+            <li>Relevant ASTM Standards (D6251, D6256, D7478 - previously mentioned)</li>
+            <li>Other PPTX/PDFs in 'docs/' like AMAT_ModelBld*.pdf, B_Style Crate*.pptx</li>
+        </ul>
+
+        <div class="note">
+            <strong>Note:</strong> This plan is a high-level framework. Specific formulas, rules, material choices, exact dimensions, tolerances, and decision trees must be extracted by the <strong>USER</strong> from the provided documents and integrated into the logic modules.
+        </div>
+
+        <h2>I. Core Application Structure (PyQt6)</h2>
+        <ul>
+            <li><strong>Main GUI (`autocrate_pyqt_gui.py`):</strong>
+                <ul>
+                    <li>Input fields for all required parameters.</li>
+                    <li>Sections for Product, Crate, Component parameters.</li>
+                    <li>Display areas for calculated results (counts, dimensions, spacing).</li>
+                    <li>Button to trigger calculations and .exp file generation.</li>
+                    <li>File dialog for specifying .exp output location.</li>
+                    <li>Status bar for feedback.</li>
+                </ul>
+            </li>
+            <li><strong>Logic Modules (`wizard_app/`):</strong>
+                <ul>
+                    <li>`config.py`: Centralized constants, material properties, standard sizes, rules from documents.</li>
+                    <li>`skid_logic.py`: Skid calculation functions.</li>
+                    <li>`floorboard_logic.py`: Floorboard calculation functions.</li>
+                    <li>`wall_logic.py`: Wall (side/end panel) calculation functions.</li>
+                    <li>`cap_logic.py`: Cap calculation functions.</li>
+                    <li>`decal_logic.py`: Stencil/decal placement logic (from `0251-70054 (1) stencils.pdf`).</li>
+                    <li>`exp_generator.py`: Functions to compile all data and generate the .exp file content.</li>
+                </ul>
+            </li>
+        </ul>
+
+        <h2>II. Input Parameters (to be defined in GUI and `config.py`)</h2>
+        <div class="user-action">
+            <strong>User Action:</strong> Identify all necessary input parameters from the specification documents (e.g., `0250-00098 rev 10.pdf`).
+        </div>
+        <table>
+            <thead><tr><th>Parameter Category</th><th>Potential Parameters</th><th>Source Document Reference (User to Fill)</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td>Product Details</td>
+                    <td>Length, Width, Height, Weight, Fragility, Special Handling Needs</td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td>Crate Construction Style</td>
+                    <td>Type (e.g., B-Style), Material choices (Lumber grades, Plywood types), Fastener types</td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td>Clearances</td>
+                    <td>Product-to-wall (side, end), Product-to-cap (top), Skid-to-ground (if applicable)</td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td>Component Specifics</td>
+                    <td>Nominal lumber sizes, Panel thicknesses, Cleat sizes, Max/min spacing rules</td>
+                    <td></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>III. Component Calculation Logic (to be implemented in respective logic modules)</h2>
+
+        <h3>A. Skid Assembly (`skid_logic.py`)</h3>
+        <ul>
+            <li>Determine skid type (e.g., 2x4, 4x4, 4x6) based on product weight and potentially width (rules from `0250-00098 rev 10.pdf` or ASTM standards).</li>
+            <li>Calculate number of skids based on product width/length, crate width, and max spacing rules.</li>
+            <li>Determine skid dimensions (actual width, height, length). Skid length likely based on overall crate length.</li>
+            <li>Calculate spacing between skids.</li>
+            <li>Output: Skid count, dimensions, spacing, positions.</li>
+        </ul>
+        <div class="user-action">
+            <strong>User Action:</strong> Extract specific rules for skid type selection, count, and spacing from documents.
+        </div>
+
+        <h3>B. Floorboard System (`floorboard_logic.py`)</h3>
+        <ul>
+            <li>Determine required floorboard coverage area (internal crate dimensions).</li>
+            <li>Select standard floorboard lumber sizes (based on availability, strength - from `config.py` sourced from docs).</li>
+            <li>Calculate number of standard floorboards.</li>
+            <li>Implement logic for custom-width fill pieces if allowed/required.</li>
+            <li>Determine spacing/gaps according to standards.</li>
+            <li>Output: Count of standard/custom boards, their dimensions, placement positions.</li>
+        </ul>
+        <div class="user-action">
+            <strong>User Action:</strong> Define rules for floorboard selection, custom fill conditions, and acceptable gap sizes.
+        </div>
+
+        <h3>C. Wall Assembly (Sides & Ends) (`wall_logic.py`)</h3>
+        <ul>
+            <li>Calculate overall panel dimensions (Height, Width/Length). Height considering product height, clearances, skid height, floorboard thickness.</li>
+            <li>Determine panel material and thickness (e.g., plywood grade/thickness).</li>
+            <li>Design cleating structure (vertical, horizontal, diagonal if any).
+                <ul>
+                    <li>Cleat material and dimensions.</li>
+                    <li>Cleat spacing rules (max/min, edge distances).</li>
+                    <li>Rules for intermediate cleats based on panel span.</li>
+                </ul>
+            </li>
+            <li>Output: Panel dimensions, cleat counts, cleat dimensions, cleat positions for each wall.</li>
+        </ul>
+        <div class="user-action">
+            <strong>User Action:</strong> Detail wall panel construction, cleat types, sizes, and placement logic from standards.
+        </div>
+
+        <h3>D. Cap Assembly (`cap_logic.py`)</h3>
+        <ul>
+            <li>Calculate overall cap panel dimensions.</li>
+            <li>Determine cap panel material and thickness.</li>
+            <li>Design cap cleating structure (longitudinal, transverse).
+                <ul>
+                    <li>Cleat material and dimensions.</li>
+                    <li>Cleat spacing rules (max/min, edge distances).</li>
+                    <li>Rules for number of cleats based on cap span and `max_top_cleat_spacing` from CAD guide.</li>
+                </ul>
+            </li>
+            <li>Output: Cap panel dimensions, cleat counts, cleat dimensions, cleat positions.</li>
+        </ul>
+        <div class="user-action">
+            <strong>User Action:</strong> Detail cap construction, cleat types, sizes, and placement logic.
+        </div>
+
+        <h3>E. Stencils & Decals (`decal_logic.py`)</h3>
+        <ul>
+            <li>Reference `0251-70054 (1) stencils.pdf` for available stencils/decals.</li>
+            <li>Implement logic for selecting required decals based on product properties (fragility, handling).</li>
+            <li>Determine placement rules (position, orientation) for each decal on specified panels.</li>
+            <li>Output: List of decals, their target panels, and placement coordinates/parameters for the .exp file.</li>
+        </ul>
+        <div class="user-action">
+            <strong>User Action:</strong> Translate stencil/decal types and placement rules from the PDF into programmable logic.
+        </div>
+        
+        <h3>F. Fasteners (Potentially a new module or part of `config.py`)</h3>
+        <div class="note">This was not explicitly in the initial request but is crucial for complete crate design.</div>
+        <ul>
+            <li>Define fastener schedules (type, size, spacing) for:
+                <ul>
+                    <li>Skid-to-floorboard</li>
+                    <li>Floorboard-to-cleat (if applicable)</li>
+                    <li>Panel-to-cleat</li>
+                    <li>Cleat-to-cleat (wall/cap corners)</li>
+                    <li>Wall-to-base</li>
+                    <li>Cap-to-wall</li>
+                </ul>
+            </li>
+            <li>This might be too complex for initial .exp generation but should be considered for documentation or future enhancements.</li>
+        </ul>
+        <div class="user-action">
+            <strong>User Action:</strong> Check if fastener schedules are detailed in the provided documents and determine scope for .exp file.
+        </div>
+
+
+        <h2>IV. Siemens NX Expression File Generation (`exp_generator.py`)</h2>
+        <ul>
+            <li>Collate all calculated parameters from the logic modules.</li>
+            <li>Format these parameters into the NX expression file syntax (e.g., `ParameterName = Value`).</li>
+            <li>Ensure parameter names match those expected by the NX templates (refer to `cad_implementation_guide.html`).
+                <ul>
+                    <li>Example Skid: `INPUT_Skid_Nominal_Width`, `INPUT_Skid_Actual_Length`, `CALC_Skid_Count`, `CALC_Skid_Pitch`.</li>
+                    <li>Example Floorboard: `CALC_Floor_Board_Length_Across_Skids`, `FB_Std_Front_1_Actual_Width`, `FB_Std_Front_1_Y_Pos_Abs`, `FB_Std_Front_1_Suppress_Flag`.</li>
+                </ul>
+            </li>
+            <li>Include suppression flags for optional components or patterned instances.</li>
+            <li>Refer to `The new coordinate system and orientation.pptx` for any global positioning or orientation expressions.</li>
+        </ul>
+        <div class="user-action">
+            <strong>User Action:</strong> Create a comprehensive list of all expressions to be included in the .exp file, mapped from calculation results to NX parameter names.
+        </div>
+
+        <h2>V. CAD Integration and Testing</h2>
+        <ul>
+            <li>Follow `cad_implementation_guide.html` for setting up NX templates.</li>
+            <li>Define test cases based on various product inputs and expected crate configurations (as listed in the guide).</li>
+            <li>Iteratively test the generated .exp files with the NX templates.</li>
+            <li>Verify model accuracy, component suppression, and overall assembly.</li>
+        </ul>
+        
+        <h2>VI. Future Considerations / Enhancements</h2>
+        <ul>
+            <li>Bill of Materials (BOM) generation.</li>
+            <li>2D Drawing generation hints or parameters.</li>
+            <li>More advanced visualization within the PyQt app.</li>
+            <li>Database for standard parts or configurations.</li>
+        </ul>
+
+    </div>
+</body>
+</html> 

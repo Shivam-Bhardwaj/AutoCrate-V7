@@ -7,7 +7,7 @@
 # to make them accessible directly from the package.
 # from .app import main_function # Example
 
-VERSION = "0.4.4"
+VERSION = "0.6.0"
 
 # Ensure config is loaded if other modules in the package need it upon import.
 # However, individual modules should ideally import config themselves.

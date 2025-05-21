@@ -1,0 +1,47 @@
+{
+    "description": "Crate Assembly (0205-13057) - Style B Example",
+    "product": {
+        "weight": 600.0,
+        "width": 38.0,
+        "length": 46.0,
+        "height": 91.5,
+        "is_fragile": true,
+        "requires_special_handling": true
+    },
+    "construction": {
+        "clearance_side": 1.0,
+        "clearance_above_product": 1.5,
+        "panel_thickness": 0.25,
+        "cleat_thickness": 0.75,
+        "wall_cleat_width": 3.5,
+        "cap_cleat_width": 3.5,
+        "floor_lumber_thickness": 1.5
+    },
+    "options": {
+        "style": "style_b",
+        "allow_3x4_skids": true,
+        "standard_floorboard": "2x8",
+        "allow_custom_fill": true,
+        "max_cleat_spacing": 24.0
+    },
+    "removable_panels": {
+        "side_panel_1": true,
+        "side_panel_2": false,
+        "end_panel_1": false,
+        "end_panel_2": false,
+        "top_panel": false
+    },
+    "dimensions": {
+        "inside": {
+            "width": 38.0,
+            "length": 46.0,
+            "height": 91.5
+        },
+        "outside": {
+            "width": 40.0,
+            "length": 48.0,
+            "height": 97.5
+        }
+    },
+    "notes": "Based on drawings 0205-13057, 0205-13058, and 0205-13059. Uses side panel 1 as removable panel which is typical for Style B crates."
+} 

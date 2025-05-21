@@ -1,212 +1,189 @@
-# wizard_app/floorboard_logic.py
-# VERSION: Refined for N-Instance Suppression Strategy (Single Standard Type, Zero Gap Target)
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-import logging
+"""Logic for calculating floorboard components."""
+
 import math
-from typing import Dict, List, Any, Tuple
 
 try:
-    from . import config # For ALL_STANDARD_FLOORBOARDS, FLOAT_TOLERANCE
+    from . import config
 except ImportError:
-    import config # Fallback for testing or direct execution
-
-log = logging.getLogger(__name__)
+    import config # For direct testing
 
 def calculate_floorboard_layout_refined(
-    target_span_to_fill_y: float,
-    board_length_x: float, # This is CALC_Overall_Skid_Span
-    chosen_standard_nominal: str,
-    allow_custom_fill: bool,
-    floorboard_actual_thickness_z: float 
-) -> Dict[str, Any]:
-    """
-    Calculates floorboard layout using one chosen standard lumber type and one optional
-    custom fill piece to achieve minimal/zero gap, placing boards symmetrically.
-
+    target_span_to_fill_y: float, 
+    board_length_x: float, 
+    chosen_standard_floorboard_nominal_key: str, # e.g., "2x6"
+    allow_custom_fill: bool, 
+    floorboard_actual_thickness_z: float,
+    max_instances_per_side: int = 10 # From CAD guide floorboard section
+) -> dict:
+    """Calculates floorboard layout for NX, including suppression flags.
+    Assumes symmetrical placement from front and back, filling towards the center.
+    Generates exp_data with individual board parameters for NX.
     Args:
-        target_span_to_fill_y: The total span along the Y-axis that floorboards need to cover.
-        board_length_x: The length of each floorboard piece (dimension across skids, along X-axis).
-        chosen_standard_nominal: The single nominal size of standard lumber to use (e.g., "2x8").
-        allow_custom_fill: Boolean, whether a custom width piece can be used to fill the remainder.
-        floorboard_actual_thickness_z: The thickness of the floorboard lumber.
-
-    Returns:
-        A dictionary containing the layout details and summary.
+        target_span_to_fill_y: The total internal span (Y-axis) to be covered by floorboards.
+        board_length_x: The length of each floorboard (X-axis, typically CALC_Floor_Board_Length_Across_Skids).
+        chosen_standard_floorboard_nominal_key: Key for ALL_STANDARD_FLOORBOARDS (e.g., "2x6").
+        allow_custom_fill: Boolean, whether a custom width piece can be used for the final gap.
+        floorboard_actual_thickness_z: Actual thickness of the floorboard lumber.
+        max_instances_per_side: Max floorboard instances NX template supports from one side (e.g., FB_Std_Front_1 to N).
     """
-    result = {
-        "status": "INIT",
-        "message": "Floorboard calculation not started.",
-        "boards_layout_details": [], # List of dicts for each board
-        "summary": {
-            "chosen_standard_nominal": chosen_standard_nominal,
-            "chosen_standard_actual_width_y": 0.0,
-            "total_standard_boards_count": 0,
-            "custom_board_actual_width_y": 0.0,
-            "custom_board_count": 0,
-            "final_gap_y": target_span_to_fill_y, # Initially, the whole span is a gap
-            "target_span_input_y": target_span_to_fill_y,
-            "calculated_span_covered_y": 0.0 # Sum of actual board widths placed
-        }
-    }
-
-    # --- Input Validation and Setup ---
-    # Ensure config is loaded for ALL_STANDARD_FLOORBOARDS and FLOAT_TOLERANCE
-    if not config or not hasattr(config, 'ALL_STANDARD_FLOORBOARDS') or not hasattr(config, 'FLOAT_TOLERANCE'):
-        result["status"] = "ERROR"
-        result["message"] = "Configuration (config.py with ALL_STANDARD_FLOORBOARDS and FLOAT_TOLERANCE) not loaded."
-        log.error(result["message"])
-        return result
-
-    if target_span_to_fill_y <= config.FLOAT_TOLERANCE:
-        result["status"] = "ERROR"; result["message"] = "Target span for floorboards must be positive."
-        log.error(result["message"]); return result
-    if board_length_x <= config.FLOAT_TOLERANCE:
-        result["status"] = "ERROR"; result["message"] = "Board length (across skids) must be positive."
-        log.error(result["message"]); return result
-    if not chosen_standard_nominal or chosen_standard_nominal not in config.ALL_STANDARD_FLOORBOARDS:
-        result["status"] = "ERROR"; result["message"] = f"Invalid or missing standard floorboard nominal size: {chosen_standard_nominal}."
-        log.error(result["message"]); return result
-
-    standard_board_actual_width_y = config.ALL_STANDARD_FLOORBOARDS.get(chosen_standard_nominal, 0.0)
-    if standard_board_actual_width_y <= config.FLOAT_TOLERANCE:
-        result["status"] = "ERROR"; result["message"] = f"Actual width for {chosen_standard_nominal} is zero or invalid."
-        log.error(result["message"]); return result
-    
-    result["summary"]["chosen_standard_actual_width_y"] = standard_board_actual_width_y
-
-    log.info(
-        f"Refined Floorboard Calc: TargetSpanY={target_span_to_fill_y:.3f}\", "
-        f"BoardLenX={board_length_x:.3f}\", StdNominal={chosen_standard_nominal} ({standard_board_actual_width_y:.3f}\"W), "
-        f"CustomAllowed={allow_custom_fill}, ThicknessZ={floorboard_actual_thickness_z:.3f}\""
-    )
 
     boards_placed_details = []
-    current_pos_front_edge_relative = 0.0 
-    current_pos_back_edge_relative = target_span_to_fill_y
-    total_std_boards_count = 0
+    exp_data_floor = {
+        "INPUT_Floorboard_Actual_Thickness": floorboard_actual_thickness_z,
+        "CALC_Floor_Board_Length_Across_Skids": board_length_x 
+    }
 
-    # 1. Place symmetrical pairs of STANDARD boards
-    while True:
-        remaining_center_span_for_pairs = current_pos_back_edge_relative - current_pos_front_edge_relative
-        if remaining_center_span_for_pairs < (2 * standard_board_actual_width_y) - config.FLOAT_TOLERANCE:
-            break
+    standard_board_actual_width_y = config.ALL_STANDARD_FLOORBOARDS.get(chosen_standard_floorboard_nominal_key, 0.0)
+    if standard_board_actual_width_y <= config.FLOAT_TOLERANCE:
+        # Handle error: invalid standard board choice
+        return {"status": "ERROR", "message": f"Invalid standard floorboard key: {chosen_standard_floorboard_nominal_key}", "exp_data": exp_data_floor, "boards": []}
 
-        boards_placed_details.append({
-            "type": "standard", "nominal_size": chosen_standard_nominal,
-            "actual_width_y": standard_board_actual_width_y, "length_x": board_length_x,
-            "thickness_z": floorboard_actual_thickness_z,
-            "y_pos_relative_start_edge": round(current_pos_front_edge_relative, 4)
-        })
-        current_pos_front_edge_relative += standard_board_actual_width_y
-        total_std_boards_count += 1
-
-        boards_placed_details.append({
-            "type": "standard", "nominal_size": chosen_standard_nominal,
-            "actual_width_y": standard_board_actual_width_y, "length_x": board_length_x,
-            "thickness_z": floorboard_actual_thickness_z,
-            "y_pos_relative_start_edge": round(current_pos_back_edge_relative - standard_board_actual_width_y, 4)
-        })
-        current_pos_back_edge_relative -= standard_board_actual_width_y
-        total_std_boards_count += 1
+    # Initialize all possible NX instance expressions to suppress
+    for i in range(1, max_instances_per_side + 1):
+        exp_data_floor[f"FB_Std_Front_{i}_Suppress_Flag"] = 1
+        exp_data_floor[f"FB_Std_Front_{i}_Actual_Width"] = 0
+        exp_data_floor[f"FB_Std_Front_{i}_Y_Pos_Abs"] = 0 # Absolute Y position of the board's starting edge
         
-        if total_std_boards_count > 200: 
-            result["status"] = "ERROR"; result["message"] = "Exceeded standard board count limit (200)."
-            log.error(result["message"]); return result
-            
-    log.debug(f"Placed {total_std_boards_count} standard boards. Front edge at {current_pos_front_edge_relative:.3f}, Back edge at {current_pos_back_edge_relative:.3f}")
+        exp_data_floor[f"FB_Std_Back_{i}_Suppress_Flag"] = 1
+        exp_data_floor[f"FB_Std_Back_{i}_Actual_Width"] = 0
+        exp_data_floor[f"FB_Std_Back_{i}_Y_Pos_Abs"] = 0
 
-    remaining_gap_y = current_pos_back_edge_relative - current_pos_front_edge_relative
-    custom_board_actual_width_y = 0.0
+    exp_data_floor["FB_Custom_Center_Suppress_Flag"] = 1
+    exp_data_floor["FB_Custom_Center_Actual_Width"] = 0
+    exp_data_floor["FB_Custom_Center_Y_Pos_Abs"] = 0
+    
+    current_y_front_edge = 0.0 # Start from Y=0 (min Y edge of target_span_to_fill_y)
+    current_y_back_edge = target_span_to_fill_y # Max Y edge of target_span_to_fill_y
+    
+    std_boards_front_count = 0
+    std_boards_back_count = 0
     custom_board_count = 0
+    custom_board_actual_width = 0.0
 
-    if remaining_gap_y < -config.FLOAT_TOLERANCE:
-        result["status"] = "ERROR"; result["message"] = f"Internal error: Negative remaining gap ({remaining_gap_y:.4f})."
-        log.error(result["message"]); return result
+    # Place standard boards from front and back inwards
+    for i in range(1, max_instances_per_side + 1):
+        remaining_gap = current_y_back_edge - current_y_front_edge
+        if remaining_gap < standard_board_actual_width_y - config.FLOAT_TOLERANCE:
+            break # Gap too small for another standard board
 
-    if allow_custom_fill and remaining_gap_y > config.FLOAT_TOLERANCE:
-        custom_board_actual_width_y = remaining_gap_y 
-        custom_board_count = 1
-        boards_placed_details.append({
-            "type": "custom", "nominal_size": "Custom",
-            "actual_width_y": round(custom_board_actual_width_y, 4), "length_x": board_length_x,
-            "thickness_z": floorboard_actual_thickness_z,
-            "y_pos_relative_start_edge": round(current_pos_front_edge_relative, 4)
-        })
-        remaining_gap_y = 0.0 
-        log.info(f"Custom fill piece added. Width: {custom_board_actual_width_y:.3f}\"")
-    elif remaining_gap_y > config.FLOAT_TOLERANCE:
-        log.warning(f"Remaining gap of {remaining_gap_y:.3f}\" exists, custom fill not allowed or not triggered.")
+        # Place front board for this iteration i
+        if std_boards_front_count < max_instances_per_side and remaining_gap >= standard_board_actual_width_y:
+            exp_data_floor[f"FB_Std_Front_{i}_Suppress_Flag"] = 0
+            exp_data_floor[f"FB_Std_Front_{i}_Actual_Width"] = standard_board_actual_width_y
+            exp_data_floor[f"FB_Std_Front_{i}_Y_Pos_Abs"] = current_y_front_edge
+            boards_placed_details.append({"type": "std_front", "id": i, "width": standard_board_actual_width_y, "y_pos": current_y_front_edge})
+            current_y_front_edge += standard_board_actual_width_y
+            std_boards_front_count += 1
+            remaining_gap = current_y_back_edge - current_y_front_edge # Update remaining gap
 
-    boards_placed_details.sort(key=lambda b: b["y_pos_relative_start_edge"])
-    result["boards_layout_details"] = boards_placed_details
-    
-    result["summary"]["total_standard_boards_count"] = total_std_boards_count
-    result["summary"]["custom_board_actual_width_y"] = round(custom_board_actual_width_y, 4)
-    result["summary"]["custom_board_count"] = custom_board_count
-    result["summary"]["final_gap_y"] = round(remaining_gap_y, 4)
-    
-    calculated_span_covered_by_boards_only = sum(b["actual_width_y"] for b in boards_placed_details)
-    result["summary"]["calculated_span_covered_y"] = round(calculated_span_covered_by_boards_only, 4)
+        # Place back board for this iteration i, if space allows
+        if std_boards_back_count < max_instances_per_side and remaining_gap >= standard_board_actual_width_y:
+            exp_data_floor[f"FB_Std_Back_{i}_Suppress_Flag"] = 0
+            exp_data_floor[f"FB_Std_Back_{i}_Actual_Width"] = standard_board_actual_width_y
+            # Y_Pos_Abs for back boards is the STARTING edge of the board, from Y=0 origin.
+            # So, it's current_y_back_edge - standard_board_actual_width_y
+            exp_data_floor[f"FB_Std_Back_{i}_Y_Pos_Abs"] = current_y_back_edge - standard_board_actual_width_y
+            boards_placed_details.append({"type": "std_back", "id": i, "width": standard_board_actual_width_y, "y_pos": current_y_back_edge - standard_board_actual_width_y})
+            current_y_back_edge -= standard_board_actual_width_y
+            std_boards_back_count += 1
+        elif remaining_gap < standard_board_actual_width_y - config.FLOAT_TOLERANCE and remaining_gap > config.FLOAT_TOLERANCE:
+            break # Gap smaller than a standard board, but still positive. Will be handled by custom fill or left as is. 
 
-    if not math.isclose(target_span_to_fill_y, calculated_span_covered_by_boards_only + result["summary"]["final_gap_y"], abs_tol=config.FLOAT_TOLERANCE * 10):
-        result["status"] = "ERROR"
-        result["message"] = (f"Critical Error: Span verification failed. Target: {target_span_to_fill_y:.4f} != "
-                             f"Boards_Width_Sum ({calculated_span_covered_by_boards_only:.4f}) + Final_Gap ({result['summary']['final_gap_y']:.4f})")
-        log.error(result["message"]); return result
+    final_gap_y = current_y_back_edge - current_y_front_edge
 
-    result["status"] = "OK"
-    if result["summary"]["final_gap_y"] > config.FLOAT_TOLERANCE:
-        result["status"] = "WARNING" 
-        result["message"] = f"Floorboard layout calculated. Note: Final gap of {result['summary']['final_gap_y']:.4f}\" exists."
-    else:
-        result["message"] = "Floorboard layout calculated successfully with minimal/zero gap."
-    
-    log.info(f"Floorboard Calculation Complete. Status: {result['status']}. Boards: {len(boards_placed_details)}. Final Gap: {result['summary']['final_gap_y']:.4f}")
-    return result
+    if allow_custom_fill and final_gap_y > config.FLOAT_TOLERANCE: 
+        # Check if custom width is within configured min/max for a single custom piece
+        # For simplicity, assuming one custom piece if allowed. More complex logic could split it.
+        if final_gap_y >= config.MIN_CUSTOM_NARROW_WIDTH - config.FLOAT_TOLERANCE: # only if gap is reasonably large
+            custom_board_actual_width = final_gap_y
+            exp_data_floor["FB_Custom_Center_Suppress_Flag"] = 0
+            exp_data_floor["FB_Custom_Center_Actual_Width"] = custom_board_actual_width
+            exp_data_floor["FB_Custom_Center_Y_Pos_Abs"] = current_y_front_edge # Place it after the last front board
+            boards_placed_details.append({"type": "custom_center", "id": 1, "width": custom_board_actual_width, "y_pos": current_y_front_edge})
+            custom_board_count = 1
+            final_gap_y = 0 # Gap filled by custom board
+        # Else: gap too small for preferred custom, or custom not allowed. Gap remains.
+
+    # Sorting boards by Y position for easier review if needed
+    boards_placed_details.sort(key=lambda b: b["y_pos"])
+
+    return {
+        "status": "OK",
+        "message": "Floorboard layout calculated.",
+        "standard_board_nominal_type": chosen_standard_floorboard_nominal_key,
+        "standard_board_actual_width": standard_board_actual_width_y,
+        "std_boards_front_count": std_boards_front_count,
+        "std_boards_back_count": std_boards_back_count,
+        "custom_board_count": custom_board_count,
+        "custom_board_actual_width": custom_board_actual_width,
+        "final_gap_y_remaining": final_gap_y,
+        "board_length_x": board_length_x,
+        "floorboard_actual_thickness_z": floorboard_actual_thickness_z,
+        "boards_placed_details": boards_placed_details, # For detailed review/logging
+        "exp_data": exp_data_floor
+    }
 
 if __name__ == '__main__':
-    if not hasattr(config, 'ALL_STANDARD_FLOORBOARDS'): 
-        config.ALL_STANDARD_FLOORBOARDS = {"2x6": 5.5, "2x8": 7.25, "2x10": 9.25, "2x12": 11.25}
-    if not hasattr(config, 'FLOAT_TOLERANCE'):
-        config.FLOAT_TOLERANCE = 1e-6
+    try: from . import config
+    except ImportError: import config
+    import json
 
-    logging.basicConfig(level=logging.DEBUG)
+    print("--- Floorboard Test Cases ---")
 
-    test_target_span_y = 60.0 
-    test_board_len_x = 70.0   
-    test_std_nominal = "2x8" 
-    test_allow_custom = True
+    # Test Case based on CAD guide (many instances)
+    # INPUT_Floorboard_Length_X = CALC_Floor_Board_Length_Across_Skids
+    # INPUT_Floorboard_Width_Y = FB_Std_Front_1_Actual_Width
+    # INPUT_Floorboard_Thickness_Z = INPUT_Floorboard_Actual_Thickness
+    # Position Y = FB_Std_Front_1_Y_Pos_Abs + (FB_Std_Front_1_Actual_Width / 2) -> this implies Y_Pos_Abs is edge, and NX origin is center of board
+    # For this logic, Y_Pos_Abs is the starting edge (min Y) of the board, assuming NX template places board origin at this edge.
+    # If NX template origin is center, then Y_Pos_Abs for exp needs to be Y_Pos_Abs_edge + width/2.
+    # For now, this function returns Y_Pos_Abs as the starting edge.
+
+    test_span_y = 50.0
+    test_board_len_x = 100.0
+    test_std_key = "2x8" # Actual width 7.25
     test_thickness_z = 1.5
 
-    layout1 = calculate_floorboard_layout_refined(
-        test_target_span_y, test_board_len_x, test_std_nominal, test_allow_custom, test_thickness_z
-    )
-    print("\n--- Test Case 1 (Custom Fill Expected) ---")
-    print(f"Status: {layout1['status']}, Message: {layout1['message']}")
-    print(f"Summary: {json.dumps(layout1['summary'], indent=2)}")
-    print("Board Details:")
-    for board in layout1['boards_layout_details']:
-        print(f"  - Type: {board['type']}, Nominal: {board['nominal_size']}, "
-              f"Width(Y): {board['actual_width_y']:.3f}, Len(X): {board['length_x']:.3f}, Thick(Z): {board['thickness_z']:.3f}, "
-              f"Rel Y Pos Edge: {board['y_pos_relative_start_edge']:.3f}")
-    # Expected for 60 span, 2x8 (7.25W): 4 pairs (8 boards) = 58.0. Gap = 2.0. Custom = 2.0. Total 9 boards.
+    results1 = calculate_floorboard_layout_refined(test_span_y, test_board_len_x, test_std_key, True, test_thickness_z)
+    print(f"\nTest 1 (Span={test_span_y}, Board={test_std_key}, Custom Allowed):\n{json.dumps(results1, indent=2)}")
+    # Expected: 50 / 7.25 = 6.89. So 3 front (21.75), 3 back (21.75). Total 6 boards (43.5). Gap = 6.5
+    # Custom fill: 6.5
+    assert results1["std_boards_front_count"] == 3
+    assert results1["std_boards_back_count"] == 3 
+    assert results1["custom_board_count"] == 1
+    assert math.isclose(results1["exp_data"]["FB_Custom_Center_Actual_Width"], 6.5)
+    assert math.isclose(results1["final_gap_y_remaining"], 0.0)
 
-    test_target_span_y_2 = config.ALL_STANDARD_FLOORBOARDS["2x6"] * 4 
-    layout2 = calculate_floorboard_layout_refined(
-        test_target_span_y_2, test_board_len_x, "2x6", True, test_thickness_z
-    )
-    print("\n--- Test Case 2 (Exact Fit with Standard) ---")
-    # Expected: 4 standard 2x6 boards, 0 custom, 0 gap.
-    print(f"Summary: {json.dumps(layout2['summary'], indent=2)}")
-    for board in layout2['boards_layout_details']:
-        print(f"  - Type: {board['type']}, Nominal: {board['nominal_size']}, Width(Y): {board['actual_width_y']:.3f}, Rel Y Pos Edge: {board['y_pos_relative_start_edge']:.3f}")
+    results2 = calculate_floorboard_layout_refined(test_span_y, test_board_len_x, test_std_key, False, test_thickness_z)
+    print(f"\nTest 2 (Span={test_span_y}, Board={test_std_key}, Custom NOT Allowed):\n{json.dumps(results2, indent=2)}")
+    assert results2["custom_board_count"] == 0
+    assert math.isclose(results2["final_gap_y_remaining"], 6.5)
 
-    test_target_span_y_3 = 60.0
-    layout3 = calculate_floorboard_layout_refined(
-        test_target_span_y_3, test_board_len_x, "2x12", False, test_thickness_z 
-    )
-    print("\n--- Test Case 3 (No Custom, Gap Remains) ---")
-    # Expected for 60 span, 2x12 (11.25W): 2 pairs (4 boards) = 45.0. Gap = 15.0.
-    print(f"Summary: {json.dumps(layout3['summary'], indent=2)}")
-    for board in layout3['boards_layout_details']:
-        print(f"  - Type: {board['type']}, Nominal: {board['nominal_size']}, Width(Y): {board['actual_width_y']:.3f}, Rel Y Pos Edge: {board['y_pos_relative_start_edge']:.3f}")
+    test_span_y_small_gap = 15.0 # 2x8 (7.25) * 2 = 14.5. Gap = 0.5
+    results3 = calculate_floorboard_layout_refined(test_span_y_small_gap, test_board_len_x, test_std_key, True, test_thickness_z)
+    print(f"\nTest 3 (Span={test_span_y_small_gap}, Small Gap, Custom Allowed but < MIN_CUSTOM_NARROW_WIDTH):\n{json.dumps(results3, indent=2)}")
+    assert results3["std_boards_front_count"] == 1
+    assert results3["std_boards_back_count"] == 1
+    assert results3["custom_board_count"] == 0 # Custom should not be placed if gap < MIN_CUSTOM_NARROW_WIDTH
+    assert math.isclose(results3["final_gap_y_remaining"], 0.5)
+
+    test_span_y_exact_fit = 14.5 # 2x8 (7.25) * 2 = 14.5. Gap = 0.0
+    results4 = calculate_floorboard_layout_refined(test_span_y_exact_fit, test_board_len_x, test_std_key, True, test_thickness_z)
+    print(f"\nTest 4 (Span={test_span_y_exact_fit}, Exact Fit):\n{json.dumps(results4, indent=2)}")
+    assert results4["std_boards_front_count"] == 1
+    assert results4["std_boards_back_count"] == 1
+    assert results4["custom_board_count"] == 0
+    assert math.isclose(results4["final_gap_y_remaining"], 0.0)
+
+    test_span_y_single_board = 7.0
+    results5 = calculate_floorboard_layout_refined(test_span_y_single_board, test_board_len_x, test_std_key, True, test_thickness_z)
+    print(f"\nTest 5 (Span={test_span_y_single_board}, Should be custom fill only or one std if it fits):\n{json.dumps(results5, indent=2)}")
+    # Current logic: Tries to place std first. Gap is 7.0, std_width 7.25. So std_front_count = 0, std_back_count = 0.
+    # Then custom fill for 7.0
+    assert results5["std_boards_front_count"] == 0
+    assert results5["std_boards_back_count"] == 0
+    assert results5["custom_board_count"] == 1
+    assert math.isclose(results5["custom_board_actual_width"], 7.0) 

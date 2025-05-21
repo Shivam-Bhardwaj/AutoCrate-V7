@@ -1,628 +1,676 @@
-# autocrate_pyqt_gui.py
-# Version: 0.8.34_PyQt_InputConsolidation
-# Main application for AutoCrate using PyQt6 for the GUI
-
 import sys
 import os
-import json
+import json # For results display if needed
 import datetime
-import logging
-import math 
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
+                             QGridLayout, QLabel, QLineEdit, QPushButton, QComboBox, 
+                             QCheckBox, QGroupBox, QScrollArea, QStatusBar, QMessageBox,
+                             QFileDialog, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView)
+from PyQt6.QtGui import QDoubleValidator, QIntValidator, QFont, QPalette, QColor
+from PyQt6.QtCore import Qt
 
-# --- Setup Logging ---
-log = logging.getLogger(__name__)
-if not log.handlers:
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Make sure wizard_app is in the Python path
+sys.path.append(os.path.join(os.path.dirname(__file__), 'wizard_app'))
 
-# --- Add Project Root to Python Path ---
-current_script_dir = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT_PATH = current_script_dir 
-if PROJECT_ROOT_PATH not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT_PATH)
-log.info(f"Project root added to sys.path: {PROJECT_ROOT_PATH}")
-
-# --- Import Core Logic Modules ---
 try:
     from wizard_app import config
     from wizard_app import skid_logic
     from wizard_app import floorboard_logic
-    log.info("Successfully imported config, skid_logic, floorboard_logic using 'from wizard_app import ...'.")
+    from wizard_app import cap_logic
+    from wizard_app import wall_logic
+    from wizard_app import decal_logic
+    from wizard_app import exp_generator
+    from wizard_app.ui_modules import CrateVisualizationManager, SkidVisualizationWidget, FloorboardVisualizationWidget, WallVisualizationWidget, CapVisualizationWidget
+    from wizard_app.ui_modules.base_assembly_views import FloorboardTopView, SkidFrontView
 except ImportError as e:
-    log.error(f"CRITICAL ERROR: Could not import core logic modules from 'wizard_app': {e}")
-    config = None
-    skid_logic = None
-    floorboard_logic = None
-except Exception as e_gen:
-    log.error(f"An unexpected error occurred during core logic module imports: {e_gen}", exc_info=True)
-    config = None
-    skid_logic = None
-    floorboard_logic = None
+    print(f"Critical Import Error: {e}. Ensure wizard_app modules are accessible.")
+    # In a real app, you might show a QMessageBox and exit.
+    # QMessageBox.critical(None, "Import Error", f"Failed to import a necessary module: {e}")
+    # sys.exit(1)
+    raise
 
-# --- Import PyQt6 ---
-try:
-    from PyQt6.QtWidgets import (
-        QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
-        QLabel, QLineEdit, QPushButton, QComboBox, QCheckBox, QMessageBox,
-        QScrollArea, QGroupBox, QFrame, QFileDialog, QStatusBar
-    )
-    from PyQt6.QtCore import Qt, QLocale
-    from PyQt6.QtGui import QDoubleValidator, QIntValidator, QFont, QPalette, QColor
-except ImportError:
-    log.error("CRITICAL ERROR: PyQt6 is not installed. Please install it using 'pip install PyQt6'")
-    sys.exit("PyQt6 not found. Please install it: pip install PyQt6")
-
-
-# --- .exp File Generation Logic ---
-def generate_nx_exp_file_content_for_pyqt(product_params, skid_results_for_exp, floorboard_exp_data):
-    p_weight = product_params.get('product_weight', 2500.0)
-    p_width = product_params.get('product_width', 90.0)
-    p_length = product_params.get('product_length', 90.0)
-    p_actual_height = product_params.get('product_actual_height', 48.0)
-    p_clearance_side = product_params.get('clearance_side', 2.0)
-    p_clearance_above = product_params.get('clearance_above_product', 1.5)
-    p_panel_thickness = product_params.get('panel_thickness', 0.25) # Default updated
-    # Use the single cleat_thickness for both wall and cap in .exp file
-    p_cleat_thickness_unified = product_params.get('cleat_thickness', 0.75) 
-    chosen_std_fb_nominal_from_params = product_params.get('chosen_standard_floorboard_nominal', "N/A")
-    allow_3x4_skids_info = product_params.get('allow_3x4_skids', True) 
-    
-    float_tol = 1e-6 
-    if config and hasattr(config, 'FLOAT_TOLERANCE'): 
-        float_tol = config.FLOAT_TOLERANCE
-
-    generation_time = product_params.get('generation_timestamp', datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-
-    exp_content = []
-    exp_content.append("// NX Expressions for AutoCrate Wizard - Skids & Floorboards (N-Instance Strategy)")
-    exp_content.append(f"// Parameters from PyQt GUI at: {generation_time}")
-    exp_content.append(f"// Allow 3x4 Skids for Light Loads Option: {'Enabled' if allow_3x4_skids_info else 'Disabled'}")
-    
-    exp_content.append("\n// =============================")
-    exp_content.append("// 1. USER CONTROLS (Values from UI)")
-    exp_content.append("// =============================")
-    exp_content.append(f"[lbm]product_weight = {p_weight:.1f}  // Product Weight")
-    exp_content.append(f"[Inch]product_width = {p_width:.2f}     // Product Width - across skids (Max 120)")
-    exp_content.append(f"[Inch]product_length = {p_length:.2f}    // Product Length - along skids (Max 120)")
-    exp_content.append(f"[Inch]product_actual_height = {p_actual_height:.2f} // Product Actual Height (for content) (Max 120)")
-    exp_content.append(f"[Inch]clearance_side = {p_clearance_side:.2f}     // Clearance per Side (product to inner wall face)")
-    exp_content.append(f"[Inch]clearance_above_product = {p_clearance_above:.2f} // Clearance above product")
-    exp_content.append(f"[Inch]panel_thickness = {p_panel_thickness:.3f}   // Panel Sheathing Thickness (Default 0.25)")
-    exp_content.append(f"[Inch]cleat_thickness = {p_cleat_thickness_unified:.3f}   // General Cleat Actual Thickness") # Consolidated
-    exp_content.append(f"[Inch]wall_cleat_width = {product_params.get('wall_cleat_width', 3.5):.2f} // Wall Cleat Actual Width")
-    exp_content.append(f"[Inch]floor_lumbar_thickness = {product_params.get('floor_lumbar_thickness', 1.5):.3f} // Floorboard Actual Thickness")
-    exp_content.append(f"// CHOSEN_Std_Floorboard_Nominal_UI: \"{chosen_std_fb_nominal_from_params}\" (Selected in UI - For Info Only)") 
-    exp_content.append(f"[Inch]cap_cleat_width = {product_params.get('cap_cleat_width', 3.5):.2f}     // Cap Cleat Actual Width")
-    exp_content.append(f"[Inch]max_cap_cleat_spacing_rule = {product_params.get('max_top_cleat_spacing', 24.0):.2f} // Max rule for cap cleats")
-
-    exp_content.append("\n// --- Constants (Informational) ---")
-    exp_content.append("[Inch]min_skid_height_const = 3.5")
-    exp_content.append(f"[Inch]float_tolerance_const = {float_tol:.6f}")
-
-    exp_content.append("\n// ===========================================")
-    exp_content.append("// 2. CALCULATED CRATE AND USABLE DIMENSIONS (NX Expressions)")
-    exp_content.append("// ===========================================")
-    # Use the single 'cleat_thickness' for these calculations
-    exp_content.append("[Inch]crate_width_OD = product_width + 2 * (clearance_side + panel_thickness + cleat_thickness)")
-    exp_content.append("[Inch]crate_length_OD = product_length + 2 * (clearance_side + panel_thickness + cleat_thickness)")
-    exp_content.append("[Inch]skid_usable_width_ID = crate_width_OD - 2 * (panel_thickness + cleat_thickness)")
-
-    exp_content.append("\n// =============================")
-    exp_content.append("// 3. SKID LAYOUT (Values from Python skid_logic, for NX Pattern)")
-    exp_content.append("// =============================")
-    exp_content.append(f"[Inch]INPUT_Skid_Nominal_Width = {skid_results_for_exp.get('skid_width', 3.5):.3f}")
-    exp_content.append(f"[Inch]INPUT_Skid_Nominal_Height = {skid_results_for_exp.get('skid_height', 3.5):.3f}")
-    exp_content.append(f"[Inch]RULE_Max_Skid_Spacing_Ref = {skid_results_for_exp.get('max_spacing', 30.0):.2f} // Max spacing rule applied by Python logic")
-    exp_content.append(f"CALC_Skid_Count = {skid_results_for_exp.get('skid_count', 0)}")
-    exp_content.append(f"[Inch]CALC_Skid_Pitch = {skid_results_for_exp.get('spacing_actual', 0.0):.4f}")
-    
-    first_skid_pos_x_py_calc = 0.0
-    skid_count_val = skid_results_for_exp.get('skid_count', 0)
-    skid_spacing_val = skid_results_for_exp.get('spacing_actual', 0.0)
-    if skid_count_val == 1: first_skid_pos_x_py_calc = 0.0
-    elif skid_count_val > 1:
-        total_centerline_span_py = skid_spacing_val * (skid_count_val - 1)
-        first_skid_pos_x_py_calc = -total_centerline_span_py / 2.0
-    exp_content.append(f"[Inch]CALC_First_Skid_Pos_X = {first_skid_pos_x_py_calc:.4f}")
-    
-    _overall_skid_span_py = 0.0
-    skid_width_val = skid_results_for_exp.get('skid_width', 0.0)
-    if skid_count_val == 0: _overall_skid_span_py = 0.0
-    elif skid_count_val == 1: _overall_skid_span_py = skid_width_val
-    elif skid_count_val > 1: _overall_skid_span_py = (skid_count_val - 1) * skid_spacing_val + skid_width_val
-    exp_content.append(f"[Inch]CALC_Overall_Skid_Span = {_overall_skid_span_py:.3f}")
-    exp_content.append("[Inch]INPUT_Skid_Actual_Length = crate_length_OD") 
-
-    exp_content.append("\n// ===========================================")
-    exp_content.append("// 4. FLOORBOARD PARAMETERS (for N-Instance Suppression Strategy)")
-    exp_content.append("// ===========================================")
-    # CALC_Floor_Start_Y_Offset_Abs will use the single 'cleat_thickness' from user controls
-    exp_content.append("[Inch]CALC_Floor_Start_Y_Offset_Abs = cleat_thickness + panel_thickness") 
-    exp_content.append(f"[Inch]CALC_Floor_Target_Layout_Span = {floorboard_exp_data.get('target_span_to_fill', 0.0):.3f}")
-    exp_content.append("[Inch]CALC_Floor_Board_Length_Across_Skids = CALC_Overall_Skid_Span")
-    exp_content.append("[Inch]INPUT_Floorboard_Actual_Thickness = floor_lumbar_thickness")
-    exp_content.append(f"[Inch]CHOSEN_Std_Floorboard_Actual_Width_Val = {floorboard_exp_data.get('standard_board_actual_width', 0.0):.3f}")
-    exp_content.append(f"// INFO_Python_Std_Floorboard_Count = {product_params.get('calculated_standard_floorboard_count',0)}")
-    exp_content.append(f"// INFO_Python_Custom_Floorboard_Count = {product_params.get('calculated_custom_floorboard_count',0)}")
-    exp_content.append(f"// INFO_Python_Custom_Floorboard_Width = {product_params.get('calculated_custom_floorboard_width',0.0):.3f} [Inch]")
-    exp_content.append(f"// INFO_Python_Final_Floor_Gap = {product_params.get('calculated_final_floor_gap',0.0):.4f} [Inch]")
-
-    MAX_FB_SLOTS_PER_SIDE = 10 
-    exp_content.append("\n// --- Front Standard Floorboards (Max " + str(MAX_FB_SLOTS_PER_SIDE) + " slots) ---")
-    front_boards_list = floorboard_exp_data.get('front_boards', [])
-    for i in range(1, MAX_FB_SLOTS_PER_SIDE + 1):
-        fb_data = front_boards_list[i-1] if i-1 < len(front_boards_list) else {}
-        suppress = 0 if fb_data else 1
-        width = fb_data.get('width', 0.0) if not suppress else 0.0
-        y_pos_abs = fb_data.get('y_pos_abs_leading_edge', 0.0) if not suppress else 0.0
-        exp_content.append(f"FB_Std_Front_{i}_Suppress_Flag = {suppress}")
-        exp_content.append(f"[Inch]FB_Std_Front_{i}_Actual_Width = {width:.3f}")
-        exp_content.append(f"[Inch]FB_Std_Front_{i}_Y_Pos_Abs = {y_pos_abs:.3f} // Leading Edge Y")
-
-    exp_content.append("\n// --- Back Standard Floorboards (Max " + str(MAX_FB_SLOTS_PER_SIDE) + " slots) ---")
-    back_boards_list = floorboard_exp_data.get('back_boards', [])
-    for i in range(1, MAX_FB_SLOTS_PER_SIDE + 1):
-        fb_data = back_boards_list[i-1] if i-1 < len(back_boards_list) else {}
-        suppress = 0 if fb_data else 1
-        width = fb_data.get('width', 0.0) if not suppress else 0.0
-        y_pos_abs = fb_data.get('y_pos_abs_leading_edge', 0.0) if not suppress else 0.0
-        exp_content.append(f"FB_Std_Back_{i}_Suppress_Flag = {suppress}")
-        exp_content.append(f"[Inch]FB_Std_Back_{i}_Actual_Width = {width:.3f}")
-        exp_content.append(f"[Inch]FB_Std_Back_{i}_Y_Pos_Abs = {y_pos_abs:.3f} // Leading Edge Y")
-
-    exp_content.append("\n// --- Custom Middle Floorboard (1 slot) ---")
-    custom_data = floorboard_exp_data.get('custom_board', {})
-    custom_width_val = custom_data.get('width', 0.0)
-    suppress_custom = 0 if custom_data and custom_width_val > float_tol else 1
-    width_custom = custom_width_val if not suppress_custom else 0.0
-    y_pos_abs_custom = custom_data.get('y_pos_abs_leading_edge', 0.0) if not suppress_custom else 0.0
-    exp_content.append(f"FB_Custom_Suppress_Flag = {suppress_custom}")
-    exp_content.append(f"[Inch]FB_Custom_Actual_Width = {width_custom:.3f}")
-    exp_content.append(f"[Inch]FB_Custom_Y_Pos_Abs = {y_pos_abs_custom:.3f} // Leading Edge Y")
-    exp_content.append(f"[Inch]CALC_Floor_Final_Gap_Debug = {floorboard_exp_data.get('final_gap', 0.0):.4f} // For verification (Python calc)")
-
-    exp_content.append("\n// End of AutoCrate Wizard Expressions")
-    return "\n".join(exp_content)
-
-# --- Application Stylesheet (same as 0.8.29) ---
-APP_STYLESHEET = """
-    QMainWindow, QWidget { 
-        background-color: #F0F4F8; 
-        font-family: Segoe UI, Arial, sans-serif; 
-        color: #1A252F; 
-    }
-    QGroupBox {
-        font-weight: bold; font-size: 10pt; border: 1px solid #B0BEC5; 
-        border-radius: 4px; margin-top: 1ex; padding: 1.2ex 8px 8px 8px; 
-    }
-    QGroupBox::title {
-        subcontrol-origin: margin; subcontrol-position: top left; 
-        padding: 2px 6px; left: 9px; background-color: #E1E8ED; 
-        border: 1px solid #B0BEC5; border-bottom: 1px solid #E1E8ED; 
-        border-top-left-radius: 3px; border-top-right-radius: 3px;
-        color: #263238; 
-    }
-    QLabel {
-        font-size: 9pt; padding-top: 5px; padding-bottom: 5px;
-        color: #263238; font-weight: 500; 
-    }
-    QLineEdit, QComboBox {
-        padding: 5px; border: 1px solid #90A4AE; border-radius: 3px;
-        font-size: 9pt; background-color: #FFFFFF; color: #1A252F;            
-        selection-background-color: #64B5F6; selection-color: #FFFFFF;           
-        min-height: 1.9em; 
-    }
-    QComboBox::drop-down { border-left: 1px solid #B0BEC5; width: 18px; }
-    QCheckBox {
-        font-size: 9pt; spacing: 6px; color: #263238;
-        padding-top: 5px; padding-bottom: 5px;
-    }
-    QPushButton {
-        font-size: 10pt; font-weight: 500; padding: 8px 16px; 
-        border: 1px solid #78909C; border-radius: 3px;
-        background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FAFAFA, stop:1 #E0E0E0);
-        color: #263238; min-width: 100px; 
-    }
-    QPushButton:hover {
-        background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FFFFFF, stop:1 #E8E8E8);
-        border-color: #546E7A; 
-    }
-    QPushButton:pressed {
-        background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #D0D0D0, stop:1 #C8C8C8);
-    }
-    QPushButton#GenerateExpButton { 
-        font-weight: bold; font-size: 10pt; 
-        background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #5cb85c, stop:1 #4cae4c); 
-        color: white; border-color: #3d8b3d; min-width: 120px; 
-    }
-    QPushButton#GenerateExpButton:hover {
-        background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #67c467, stop:1 #52b852);
-    }
-    QPushButton#GenerateExpButton:pressed {
-        background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #45a045, stop:1 #409140);
-    }
-    QStatusBar { font-size: 9pt; color: #37474F; }
-"""
+class SubassemblyTab(QWidget):
+    def __init__(self, title, top_view_widget, side_view_widget, logic_text):
+        super().__init__()
+        layout = QVBoxLayout(self)
+        # Title
+        title_label = QLabel(f"<b>{title}</b>")
+        layout.addWidget(title_label)
+        # Views
+        views_layout = QHBoxLayout()
+        views_layout.addWidget(top_view_widget)
+        views_layout.addWidget(side_view_widget)
+        layout.addLayout(views_layout)
+        # Logic dropdown
+        logic_group = QGroupBox("Logic Used")
+        logic_group.setCheckable(True)
+        logic_group.setChecked(False)
+        logic_layout = QVBoxLayout()
+        logic_label = QLabel(logic_text)
+        logic_label.setWordWrap(True)
+        logic_layout.addWidget(logic_label)
+        logic_group.setLayout(logic_layout)
+        layout.addWidget(logic_group)
 
 class AutoCrateApp(QMainWindow):
-    EXP_FILENAME = "AutoCrate_Expressions.exp" 
-    # Define product_params_list at class level for access in initUI and collect_parameters
-    # (Label Text, dict key, default, type, precision, min_val, max_val, tooltip)
-    MAX_PRODUCT_DIM_CONST = 120.0 # Define as a constant
-    
-    parameter_definitions = [
-        ("Prod. Weight (lbs):", 'product_weight', 1800.0, "float", 1, 1.0, 20000.0, "Total weight of the product."),
-        ("Prod. Width (in):", 'product_width', 75.0, "float", 2, 1.0, MAX_PRODUCT_DIM_CONST, f"Product dimension across skids (Max {MAX_PRODUCT_DIM_CONST:.1f})."),
-        ("Prod. Length (in):", 'product_length', 110.0, "float", 2, 1.0, MAX_PRODUCT_DIM_CONST, f"Product dimension along skids (Max {MAX_PRODUCT_DIM_CONST:.1f})."),
-        ("Prod. Height (in):", 'product_actual_height', 55.0, "float", 2, 1.0, MAX_PRODUCT_DIM_CONST, f"Actual height of the product (Max {MAX_PRODUCT_DIM_CONST:.1f})."),
-        ("Clearance Side (in):", 'clearance_side', 2.5, "float", 2, 0.0, 20.0, "Clearance (W & L) to inner wall."),
-        ("Clearance Above (in):", 'clearance_above_product', 2.0, "float", 2, 0.0, 20.0, "Clearance above product top."),
-        ("Panel Thickness (in):", 'panel_thickness', 0.25, "float", 3, 0.01, 2.0, "Sheathing thickness (Default 0.25)."), # Default Changed
-        ("Cleat Thickness (in):", 'cleat_thickness', 0.75, "float", 3, 0.01, 3.0, "Actual thickness for ALL cleats (wall, cap)."), # Consolidated
-        ("Wall Cleat Width (in):", 'wall_cleat_width', 3.5, "float", 2, 0.1, 12.0, "Actual width of wall cleats."),
-        # ("Floorboard Thk (in):", 'floor_lumbar_thickness', 1.5, "float", 3, 0.1, 3.0, "Actual thickness of floorboards."), # This is still used by floorboard logic
-        ("Cap Cleat Width (in):", 'cap_cleat_width', 3.5, "float", 2, 0.1, 12.0, "Actual width of cap cleats."),
-        ("Max Cap Cleat Space (in):", 'max_top_cleat_spacing', 24.0, "float", 2, 1.0, 60.0, "Max C-C spacing for cap cleats.")
-    ]
-    # Add Floorboard Thk separately as it's not in the main loop for product_params_group
-    floorboard_thk_def = ("Floorboard Thk (in):", 'floor_lumbar_thickness', 1.5, "float", 3, 0.1, 3.0, "Actual thickness of floorboards.")
+    EXP_FILENAME = "AutoCrate_Expressions.exp"
+    MAX_PRODUCT_DIM_CONST = 999.0 
 
+    parameter_definitions = [
+        ("Product Weight (lbs):", 'product_weight', 600.0, "float", 1, 1.0, 20000.0, "Total weight of the product. (Example: 600 lbs)"),
+        ("Product Width (in):", 'product_width', 38.0, "float", 2, 1.0, MAX_PRODUCT_DIM_CONST, f"Inside dimension across skids - Y direction (Example: 38.00\")"),
+        ("Product Length (in):", 'product_length', 46.0, "float", 2, 1.0, MAX_PRODUCT_DIM_CONST, f"Inside dimension along skids - X direction (Example: 46.00\")"),
+        ("Product Height (in):", 'product_actual_height', 91.5, "float", 2, 1.0, MAX_PRODUCT_DIM_CONST, f"Inside height of the product (Example: 91.50\")"),
+        
+        ("Side Clearance (in):", 'clearance_side', 1.0, "float", 2, 0.0, 20.0, "Clearance from product to inner wall surfaces (width and length)."),
+        ("Top Clearance (in):", 'clearance_above_product', config.DEFAULT_CLEARANCE_ABOVE_PRODUCT, "float", 2, 0.0, 20.0, "Clearance above product top to cap panel underside."),
+        
+        ("Panel Thickness (in):", 'panel_thickness', 0.25, "float", 3, 0.25, 1.5, "Thickness for wall and cap plywood/sheathing (typically 0.25\")."),
+        ("Cleat Thickness (in):", 'cleat_thickness', 0.75, "float", 3, 0.5, 3.0, "Actual thickness for ALL cleats. Ensure size is appropriate for panel area."),
+        
+        ("Wall Cleat Width (in):", 'wall_cleat_width', 3.5, "float", 2, 1.0, 11.25, "Actual width of wall cleats. (Example: Use 3.5\" for standard)"),
+        ("Floorboard Thickness (in):", 'floor_lumbar_thickness', 1.5, "float", 3, 0.5, 3.0, "Actual thickness of floorboards (typically 1.5\")."),
+        
+        ("Cap Cleat Width (in):", 'cap_cleat_width', 3.5, "float", 2, 1.0, 11.25, "Actual width of cap cleats. (Example: Use 3.5\" for 2x4 nominal lumber)"),
+        ("Max Cleat Spacing (C-C, in):", 'max_top_cleat_spacing', 24.0, "float", 2, 6.0, 60.0, "Maximum center-to-center spacing for cap cleats (typically 24\")."),
+        
+        ("Allow 3x4 Skids (Light Loads):", 'allow_3x4_skids', True, "bool", 0, None, None, "If checked, 3x4 skids can be used for lighter loads per rules."),
+        ("Std Floorboard Size:", 'chosen_standard_floorboard_nominal', "2x8", "choice", 0, config.ALL_LUMBER_OPTIONS_UI, None, "Standard floorboard nominal size to prioritize (typically 2x8)."),
+        ("Allow Custom Fill Floorboard:", 'allow_custom_floorboard_fill', True, "bool", 0, None, None, "Allow a custom-width floorboard to fill remaining small gaps."),
+        ("Product is Fragile:", 'product_is_fragile', False, "bool", 0, None, None, "Check if product is fragile (for decal selection)."),
+        ("Special Handling Required:", 'product_requires_special_handling', False, "bool", 0, None, None, "Check if special handling decals (e.g., This Way Up) are needed."),
+        ("Front Panel Removable:", 'end_panel_1_removable', False, "bool", 0, None, None, "Make Front Panel (End Panel 1) removable."),
+        ("Back Panel Removable:", 'end_panel_2_removable', False, "bool", 0, None, None, "Make Back Panel (End Panel 2) removable."),
+        ("Left Side Panel Removable:", 'side_panel_1_removable', True, "bool", 0, None, None, "Make Left Side Panel (Side Panel 1) removable (Style B default)."),
+        ("Right Side Panel Removable:", 'side_panel_2_removable', False, "bool", 0, None, None, "Make Right Side Panel (Side Panel 2) removable."),
+        ("Top Panel Removable:", 'top_panel_removable', False, "bool", 0, None, None, "Make the Top Panel removable.")
+    ]
 
     def __init__(self):
         super().__init__()
-        self.app_version = "0.8.34" # Updated version
-        if config and hasattr(config, 'VERSION'): 
-            self.app_version = config.VERSION
-        
-        self.setWindowTitle(f"AutoCrate Wizard V8 (PyQt {self.app_version}) - Exp Generator")
-        self.setMinimumSize(780, 650) 
-        self.setStyleSheet(APP_STYLESHEET) 
-
-        QLocale.setDefault(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
-
-        self.input_widgets = {}
-        self.exp_output_path_edit = QLineEdit() 
-        self.initUI()
+        self.setWindowTitle(f"AutoCrate Wizard V{config.VERSION}")
+        self.setMinimumSize(1200, 800)
+        self.exp_output_path = ""
+        self.input_widgets = {} # Initialize here, before set_default_exp_output_path or initUI
+        self.results_labels = {}
+        self.visualization_manager = None
         self.set_default_exp_output_path()
+        self.initUI()
+        self.statusBar().showMessage("Ready")
 
     def set_default_exp_output_path(self):
-        if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        # Default to a subdirectory in the application's directory
+        if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'): # PyInstaller
             executable_dir = os.path.dirname(sys.executable)
-            default_path = os.path.join(executable_dir, self.EXP_FILENAME)
-        else:
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            target_dir = os.path.join(script_dir, "nx_part_templates")
-            if not os.path.exists(target_dir):
-                try: os.makedirs(target_dir); log.info(f"Created directory: {target_dir}")
-                except Exception as e:
-                    log.error(f"Could not create target directory {target_dir}: {e}")
-                    target_dir = script_dir 
-            default_path = os.path.join(target_dir, self.EXP_FILENAME)
-        self.exp_output_path_edit.setText(os.path.normpath(default_path))
-        log.info(f"Default .exp file output path set to: {default_path}")
+        else: # Running as script
+            executable_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        target_dir = os.path.join(executable_dir, "nx_crate_expressions")
+        if not os.path.exists(target_dir):
+            try:
+                os.makedirs(target_dir)
+            except Exception as e:
+                # Consider logging this error: print(f"Could not create target directory {target_dir}: {e}")
+                target_dir = executable_dir # Fallback to app dir
+        
+        self.exp_output_path = os.path.normpath(os.path.join(target_dir, self.EXP_FILENAME))
 
     def initUI(self):
-        self.central_widget = QWidget()
-        self.setCentralWidget(self.central_widget)
+        main_widget = QWidget()
+        self.setCentralWidget(main_widget)
+        main_layout = QVBoxLayout(main_widget)
+        main_layout.setSpacing(5)
+        main_layout.setContentsMargins(10, 10, 10, 10)
+
+        # Title at the top
+        title_label = QLabel(f"AutoCrate Wizard V{config.VERSION}")
+        title_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #0055aa; padding-bottom: 5px;")
+        main_layout.addWidget(title_label)
+
+        # Main content in a grid layout
+        content_layout = QHBoxLayout()
+        content_layout.setSpacing(10)
         
-        overall_layout = QVBoxLayout(self.central_widget)
-        overall_layout.setContentsMargins(12, 12, 12, 12); overall_layout.setSpacing(12) 
-
-        intro_label = QLabel(
-            f"<h2><b>AutoCrate Wizard</b> <span style='font-size:10pt; font-weight:normal;'>v{self.app_version}</span></h2>"
-            "<p style='font-size:9pt; color:#4a5568; margin-bottom:10px;'>Generates an NX Expression File (.exp) for parametrically "
-            "driving industrial shipping crate designs (skids & floorboards). "
-            "Enter parameters below to define your product and construction preferences.</p>"
-        )
-        intro_label.setWordWrap(True); overall_layout.addWidget(intro_label)
-
-        main_content_widget = QWidget(); main_content_layout = QHBoxLayout(main_content_widget)
-        main_content_layout.setSpacing(15); main_content_layout.setContentsMargins(0,0,0,0)
-
-        left_column_widget = QWidget(); left_column_layout = QVBoxLayout(left_column_widget)
-        left_column_layout.setSpacing(10); left_column_layout.setContentsMargins(0,0,0,0)
-
-        product_params_group = QGroupBox("Product & General Crate Parameters")
-        product_params_layout = QGridLayout(); product_params_layout.setSpacing(7); 
-        product_params_layout.setContentsMargins(10,18,10,10) 
+        # --- Left Panel: Input Parameters ---
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setSpacing(5)
+        left_layout.setContentsMargins(0, 0, 0, 0)
         
-        row = 0; col = 0
-        for label_text, key, default, val_type, precision, min_val, max_val, tooltip_text in self.parameter_definitions:
-            label = QLabel(label_text); label.setToolTip(tooltip_text)
-            edit = QLineEdit(str(default)); edit.setToolTip(tooltip_text)
-            if val_type == "float":
-                validator = QDoubleValidator(min_val, max_val, precision); 
-                validator.setNotation(QDoubleValidator.Notation.StandardNotation); 
-                edit.setValidator(validator)
-            elif val_type == "int": 
-                edit.setValidator(QIntValidator(int(min_val), int(max_val)))
-            product_params_layout.addWidget(label, row, col * 2, alignment=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter) 
-            product_params_layout.addWidget(edit, row, (col * 2) + 1)
-            self.input_widgets[key] = edit
-            col += 1
-            if col >= 2: col = 0; row += 1
+        # Organize params in two columns for more compact display
+        input_grid = QGridLayout()
+        input_grid.setSpacing(5)
+        input_grid.setColumnStretch(0, 1)  # Group name column
+        input_grid.setColumnStretch(1, 1)  # Inputs column
         
-        # Add Floorboard Thickness to this group as well
-        label_text, key, default, val_type, precision, min_val, max_val, tooltip_text = self.floorboard_thk_def
-        label = QLabel(label_text); label.setToolTip(tooltip_text)
-        edit = QLineEdit(str(default)); edit.setToolTip(tooltip_text)
-        validator = QDoubleValidator(min_val, max_val, precision); validator.setNotation(QDoubleValidator.Notation.StandardNotation); edit.setValidator(validator)
-        product_params_layout.addWidget(label, row, col * 2, alignment=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        product_params_layout.addWidget(edit, row, (col*2)+1)
-        self.input_widgets[key] = edit
-
-
-        product_params_group.setLayout(product_params_layout)
-        left_column_layout.addWidget(product_params_group)
+        row = 0
         
-        skid_options_group = QGroupBox("Skid Options")
-        skid_options_layout = QVBoxLayout(); skid_options_layout.setContentsMargins(10,15,10,10)
-        self.input_widgets['allow_3x4_skids'] = QCheckBox("Allow 3x4 Skids for Light Loads (if applicable by weight rules)")
-        self.input_widgets['allow_3x4_skids'].setToolTip("If checked, 3x4 skids may be used for loads under configured threshold.")
-        self.input_widgets['allow_3x4_skids'].setChecked(True) 
-        skid_options_layout.addWidget(self.input_widgets['allow_3x4_skids'], alignment=Qt.AlignmentFlag.AlignCenter)
-        skid_options_group.setLayout(skid_options_layout)
-        left_column_layout.addWidget(skid_options_group)
-        left_column_layout.addStretch(1) 
-
-        right_column_widget = QWidget(); right_column_layout = QVBoxLayout(right_column_widget)
-        right_column_layout.setSpacing(10); right_column_layout.setContentsMargins(0,0,0,0)
-
-        floorboard_params_group = QGroupBox("Floorboard Specifics"); floorboard_params_layout = QGridLayout() 
-        floorboard_params_layout.setSpacing(8); floorboard_params_layout.setContentsMargins(10,18,10,10)
-        label_std_fb = QLabel("Std. Floorboard Size:"); label_std_fb.setToolTip("Choose one standard lumber size.")
-        self.input_widgets['chosen_standard_floorboard_nominal'] = QComboBox(); self.input_widgets['chosen_standard_floorboard_nominal'].setToolTip("Choose one standard lumber size.")
-        std_fb_options = ["2x6", "2x8", "2x10", "2x12"]
-        if config and hasattr(config, 'ALL_STANDARD_FLOORBOARDS'): std_fb_options = sorted(list(config.ALL_STANDARD_FLOORBOARDS.keys()))
-        self.input_widgets['chosen_standard_floorboard_nominal'].addItems(std_fb_options)
-        default_fb_nominal = "2x8"
-        if default_fb_nominal in std_fb_options: self.input_widgets['chosen_standard_floorboard_nominal'].setCurrentText(default_fb_nominal)
-        floorboard_params_layout.addWidget(label_std_fb, 0, 0, alignment=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        floorboard_params_layout.addWidget(self.input_widgets['chosen_standard_floorboard_nominal'], 0, 1)
-        self.input_widgets['allow_custom_floorboard_fill'] = QCheckBox("Allow Custom Center Fill"); self.input_widgets['allow_custom_floorboard_fill'].setToolTip("Use custom board to minimize center gap.")
-        self.input_widgets['allow_custom_floorboard_fill'].setChecked(True)
-        floorboard_params_layout.addWidget(self.input_widgets['allow_custom_floorboard_fill'], 1, 0, 1, 2, alignment=Qt.AlignmentFlag.AlignCenter) 
-        floorboard_params_group.setLayout(floorboard_params_layout)
-        right_column_layout.addWidget(floorboard_params_group)
-
-        output_path_group = QGroupBox(".exp File Output"); output_path_layout = QGridLayout()
-        output_path_layout.setContentsMargins(10,8,10,8); output_path_layout.setSpacing(8)
-        output_path_layout.addWidget(QLabel("Save .exp to:"), 0, 0, alignment=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self.exp_output_path_edit.setReadOnly(True); output_path_layout.addWidget(self.exp_output_path_edit, 0, 1, 1, 2) 
-        browse_button = QPushButton("Change..."); browse_button.clicked.connect(self.browse_exp_output_location)
-        output_path_layout.addWidget(browse_button, 0, 3)
-        output_path_group.setLayout(output_path_layout)
-        right_column_layout.addWidget(output_path_group)
+        # More compact parameter groups
+        param_groups = {
+            "Product Dimensions": ['product_weight', 'product_width', 'product_length', 'product_actual_height'],
+            "Crate Construction": ['clearance_side', 'clearance_above_product', 'panel_thickness', 'cleat_thickness', 
+                                  'wall_cleat_width', 'floor_lumbar_thickness', 'cap_cleat_width', 'max_top_cleat_spacing'],
+            "Options": ['allow_3x4_skids', 'chosen_standard_floorboard_nominal', 'allow_custom_floorboard_fill', 
+                       'product_is_fragile', 'product_requires_special_handling'],
+            "Removable Panels": ['end_panel_1_removable', 'end_panel_2_removable', 'side_panel_1_removable', 
+                                'side_panel_2_removable', 'top_panel_removable']
+        }
         
-        right_column_layout.addStretch(1) 
+        for group_title, param_keys in param_groups.items():
+            group_box = QGroupBox(group_title)
+            group_box.setStyleSheet("QGroupBox { font-weight: bold; }")
+            group_layout = QGridLayout()
+            group_layout.setSpacing(5)
+            group_layout.setContentsMargins(8, 15, 8, 8)
+            
+            row_idx = 0
+            for p_label, p_key, p_default, p_type, p_dec, p_min, p_max, p_tooltip in self.parameter_definitions:
+                if p_key not in param_keys:
+                    continue
 
-        main_content_layout.addWidget(left_column_widget, 2) 
-        main_content_layout.addWidget(right_column_widget, 1) 
-        overall_layout.addWidget(main_content_widget) 
+                label_widget = QLabel(p_label)
+                label_widget.setToolTip(p_tooltip if p_tooltip else p_label)
+                
+                widget_instance = None
+                if p_type == "float":
+                    widget_instance = QLineEdit(str(p_default))
+                    validator = QDoubleValidator(p_min, p_max, p_dec)
+                    validator.setNotation(QDoubleValidator.Notation.StandardNotation)
+                    widget_instance.setValidator(validator)
+                    widget_instance.setFixedWidth(70)
+                elif p_type == "int":
+                    widget_instance = QLineEdit(str(p_default))
+                    validator = QIntValidator(int(p_min), int(p_max))
+                    widget_instance.setValidator(validator)
+                    widget_instance.setFixedWidth(70)
+                elif p_type == "bool":
+                    widget_instance = QCheckBox()
+                    widget_instance.setChecked(p_default)
+                elif p_type == "choice":
+                    widget_instance = QComboBox()
+                    if isinstance(p_min, list):
+                        widget_instance.addItems([str(item) for item in p_min])
+                    if str(p_default) in [str(item) for item in p_min if isinstance(p_min, list)]:
+                         widget_instance.setCurrentText(str(p_default))
+                    elif isinstance(p_min, list) and p_min:
+                         widget_instance.setCurrentIndex(0)
+                    widget_instance.setFixedWidth(120)
+                else:
+                    widget_instance = QLineEdit(str(p_default))
+                    widget_instance.setFixedWidth(100)
 
-        self.generate_button = QPushButton("🚀 Generate & Update .exp File")
-        self.generate_button.setObjectName("GenerateExpButton"); self.generate_button.setFixedHeight(40) 
-        self.generate_button.clicked.connect(self.run_calculations_and_generate_exp)
-        button_container_layout = QHBoxLayout(); button_container_layout.addStretch(); button_container_layout.addWidget(self.generate_button); button_container_layout.addStretch()
-        overall_layout.addLayout(button_container_layout) 
-        overall_layout.addStretch(0) 
+                if widget_instance:
+                    widget_instance.setToolTip(p_tooltip if p_tooltip else p_label)
+                    self.input_widgets[p_key] = widget_instance
+                    group_layout.addWidget(label_widget, row_idx, 0)
+                    group_layout.addWidget(widget_instance, row_idx, 1)
+                row_idx += 1
+            
+            group_box.setLayout(group_layout)
+            
+            # Place groups in a grid, 2 columns wide
+            input_grid.addWidget(group_box, row // 2, row % 2)
+            row += 1
+        
+        # Add the grid to the left panel
+        left_layout.addLayout(input_grid)
+        
+        # Add output path selection in a more compact way
+        output_frame = QGroupBox("Expression File")
+        output_layout = QHBoxLayout()
+        output_layout.setContentsMargins(8, 15, 8, 8)
+        self.output_path_label = QLabel(self.exp_output_path)
+        self.output_path_label.setWordWrap(True)
+        browse_button = QPushButton("Browse...")
+        browse_button.setFixedWidth(80)
+        browse_button.clicked.connect(self.browse_exp_output_location)
+        output_layout.addWidget(self.output_path_label, 1)
+        output_layout.addWidget(browse_button)
+        output_frame.setLayout(output_layout)
+        left_layout.addWidget(output_frame)
+        
+        # Generate button
+        generate_button = QPushButton("Generate & Update .exp File")
+        generate_button.clicked.connect(self.run_calculations_and_generate_exp)
+        left_layout.addWidget(generate_button)
+        
+        content_layout.addWidget(left_panel, 1)
 
-        self.setStatusBar(QStatusBar()); self.statusBar().showMessage("Ready.")
+        # --- Right Panel: Tabs for Results & Visualizations ---
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setSpacing(5)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Create tab widget for results and visualizations
+        tabs = QTabWidget()
+        
+        # Results Tab - with table layout
+        results_tab = QWidget()
+        results_layout = QVBoxLayout(results_tab)
+        results_layout.setContentsMargins(10, 10, 10, 10)
+        results_layout.setSpacing(5)
+        
+        # Create table for results display
+        self.results_table = QTableWidget(0, 2)  # 0 rows initially, 2 columns
+        self.results_table.setHorizontalHeaderLabels(["Field", "Value"])
+        self.results_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.results_table.setAlternatingRowColors(True)
+        self.results_table.verticalHeader().setVisible(False)
+        self.results_table.setShowGrid(True)
+        self.results_table.setGridStyle(Qt.PenStyle.SolidLine)
+
+        # Define all result fields in order
+        self.result_table_items = [
+            ("Skid Type", "skid_type"),
+            ("Skid Count", "skid_count"),
+            ("Skid Spacing", "skid_spacing"),
+            ("Skid Dimensions", "skid_dims"),
+            ("Skid Length", "skid_length"),
+            ("Floorboard Type", "floor_std_type"),
+            ("Standard Floorboard Count", "floor_std_count"),
+            ("Side Panels", "side_panel_dims"),
+            ("End Panels", "end_panel_dims"),
+            ("Top Panel", "cap_panel_dims"),
+            ("Longitudinal Cleats", "cap_long_cleats"),
+            ("Transverse Cleats", "cap_trans_cleats"),
+            ("Crate Overall Width", "crate_overall_width"),
+            ("Crate Overall Length", "crate_overall_length"),
+            ("Crate Overall Height", "crate_overall_height"),
+            ("Custom Floorboard Count", "floor_custom_count"),
+            ("Custom Floorboard Width", "floor_custom_width"),
+            ("Final Gap", "floor_gap")
+        ]
+        self.results_table.setRowCount(len(self.result_table_items))
+        self.results_labels = {}
+        for row, (label, key) in enumerate(self.result_table_items):
+            label_item = QTableWidgetItem(label)
+            font = label_item.font()
+            font.setPointSize(10)
+            label_item.setFont(font)
+            label_item.setForeground(QColor("#333333"))
+            label_item.setBackground(QColor("#F5F5F5"))
+            label_item.setFlags(label_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            self.results_table.setItem(row, 0, label_item)
+            value_item = QTableWidgetItem("")
+            value_item.setFlags(value_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            self.results_table.setItem(row, 1, value_item)
+            self.results_labels[key] = row
+        
+        results_layout.addWidget(self.results_table)
+        
+        # Visualization Tab
+        visualization_tabs = QTabWidget()
+        # Create specialized visualization widgets for base assembly
+        floorboard_top_view = FloorboardTopView()
+        skid_front_view = SkidFrontView()
+        
+        # Store references to these views for later data updates
+        self.floorboard_view = floorboard_top_view
+        self.skid_view = skid_front_view
+        
+        # Create tab with the specialized views
+        visualization_tabs.addTab(SubassemblyTab("Base Assembly",
+            floorboard_top_view,
+            skid_front_view,
+            "Base assembly includes floorboards arranged across skids. Skid spacing follows the max 24 inch rule, and floorboards are selected based on standard lumber dimensions."
+        ), "Base Assembly")
+        visualization_tabs.addTab(SubassemblyTab("Front Panel",
+            QLabel("Front View: Front Panel"),
+            QLabel("Side View: Front Panel"),
+            "Logic for front panel: ..."
+        ), "Front Panel")
+        visualization_tabs.addTab(SubassemblyTab("Left Side Panel",
+            QLabel("Front View: Left Side Panel"),
+            QLabel("Side View: Left Side Panel"),
+            "Logic for left side panel: ..."
+        ), "Left Side Panel")
+        visualization_tabs.addTab(SubassemblyTab("Right Side Panel",
+            QLabel("Front View: Right Side Panel"),
+            QLabel("Side View: Right Side Panel"),
+            "Logic for right side panel: ..."
+        ), "Right Side Panel")
+        visualization_tabs.addTab(SubassemblyTab("Back Panel",
+            QLabel("Front View: Back Panel"),
+            QLabel("Side View: Back Panel"),
+            "Logic for back panel: ..."
+        ), "Back Panel")
+        visualization_tabs.addTab(SubassemblyTab("Top Panel",
+            QLabel("Top View: Top Panel"),
+            QLabel("Side View: Top Panel"),
+            "Logic for top panel: ..."
+        ), "Top Panel")
+        visualization_tabs.addTab(SubassemblyTab("Markings",
+            QLabel("Markings View 1"),
+            QLabel("Markings View 2"),
+            "Logic for markings: ..."
+        ), "Markings")
+        visualization_tabs.addTab(SubassemblyTab("Klimp Positions",
+            QLabel("Klimp Positions View 1"),
+            QLabel("Klimp Positions View 2"),
+            "Logic for Klimp positions: ..."
+        ), "Klimp Positions")
+        # Replace the old visualization tab with this:
+        tabs.addTab(visualization_tabs, "Crate Visualizations")
+        
+        right_layout.addWidget(tabs)
+        content_layout.addWidget(right_panel, 2)  # Give right panel more space
+        main_layout.addLayout(content_layout)
+        
+        # Adding status bar
+        self.statusBar().showMessage("Ready")
+        
+        # Apply styling
+        self.set_app_style()
+
+    def set_app_style(self):
+        # Minimal, professional table style
+        self.setStyleSheet("""
+            QMainWindow { background-color: white; }
+            QLabel { font-size: 10pt; color: #000; font-weight: normal; }
+            QLineEdit, QComboBox {
+                padding: 5px; border: 1px solid #888; border-radius: 3px;
+                font-size: 10pt; background: #fff; color: #000;
+            }
+            QCheckBox { font-size: 10pt; color: #000; }
+            QPushButton {
+                padding: 8px 12px; border-radius: 3px; font-size: 10pt;
+                background: #222; color: #fff; font-weight: bold; border: none;
+            }
+            QPushButton:hover { background: #444; }
+            QGroupBox {
+                border: 1px solid #ccc; border-radius: 4px; margin-top: 1.0ex;
+                font-weight: bold; color: #000; background: #f8f8f8;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin; subcontrol-position: top left;
+                padding: 0 5px; background: #f8f8f8; color: #000;
+            }
+            QTabWidget::pane { border: 1px solid #ccc; background: #fff; border-radius: 3px; }
+            QTabBar::tab {
+                background: #f5f5f5; color: #222; border: 1px solid #ccc;
+                border-bottom: none; border-top-left-radius: 3px; border-top-right-radius: 3px;
+                padding: 6px 10px; margin-right: 2px;
+            }
+            QTabBar::tab:selected {
+                background: #fff; color: #000; border-bottom: 1px solid #fff; font-weight: bold;
+            }
+            QStatusBar { font-size: 9pt; background: #f0f0f0; color: #333; }
+            QScrollArea { border: none; background: transparent; }
+            /* Table styling: minimal, high contrast */
+            QTableWidget {
+                gridline-color: #e0e0e0; background: #fff; border: 1px solid #ccc;
+                border-radius: 3px; font-size: 10pt; color: #000;
+            }
+            QTableWidget::item { padding: 6px; border-bottom: 1px solid #e0e0e0; color: #111; }
+            QHeaderView::section {
+                background: #fff; color: #111; padding: 8px; font-weight: bold;
+                border: none; border-bottom: 2px solid #bbb; font-size: 11pt;
+            }
+            QTableWidget::item:alternate { background: #fafbfc; }
+        """)
 
     def browse_exp_output_location(self):
-        current_path = self.exp_output_path_edit.text()
-        current_dir = os.path.dirname(current_path) if current_path and os.path.isdir(os.path.dirname(current_path)) else os.getcwd()
-        
-        directory = QFileDialog.getExistingDirectory(self, "Select Directory to Save .exp File", current_dir)
-        if directory: 
-            new_path = os.path.join(directory, self.EXP_FILENAME)
-            self.exp_output_path_edit.setText(os.path.normpath(new_path))
-            log.info(f".exp file output location changed to: {new_path}")
-            self.statusBar().showMessage(f"Output path set to: {new_path}", 3000)
+        current_dir = os.path.dirname(self.exp_output_path)
+        file_path, _ = QFileDialog.getSaveFileName(self, "Save .exp File", current_dir, "Expression Files (*.exp);;All Files (*)")
+        if file_path:
+            if not file_path.lower().endswith(".exp"):
+                file_path += ".exp"
+            self.exp_output_path = os.path.normpath(file_path)
+            self.output_path_label.setText(self.exp_output_path)
+            self.statusBar().showMessage(f"Output path set to: {self.exp_output_path}", 3000)
 
     def collect_parameters(self):
         params = {}
         validation_passed = True
-        # Use the class-level definition for checking defaults if needed
-        for label_text, key, default, val_type, precision, min_val, max_val, tooltip_text in self.parameter_definitions:
-            widget = self.input_widgets.get(key)
-            if not widget: continue # Should not happen if initUI is correct
+        for p_label, p_key, p_default, p_type, p_dec, p_min, p_max, p_tooltip in self.parameter_definitions:
+            widget = self.input_widgets.get(p_key)
+            if not widget: continue
 
             if isinstance(widget, QLineEdit):
                 text_value = widget.text()
-                if widget.validator() is not None:
+                if widget.validator():
                     state, _, _ = widget.validator().validate(text_value, 0)
-                    if state != QDoubleValidator.State.Acceptable and state != QIntValidator.State.Acceptable :
-                        log.warning(f"Invalid input for {key}: '{text_value}'. Validator state: {state}")
-                        QMessageBox.warning(self, "Input Error", 
-                                            f"Invalid value entered for '{label_text}'.\n'{text_value}' is not acceptable. Please enter a number within the range [{min_val} - {max_val}].")
-                        widget.setFocus() 
+                    if state != QDoubleValidator.State.Acceptable and state != QIntValidator.State.Acceptable:
+                        QMessageBox.warning(self, "Input Error", f"Invalid value for '{p_label}': '{text_value}'")
+                        widget.setFocus()
                         validation_passed = False
-                        break 
-                try: 
-                    if isinstance(widget.validator(), QDoubleValidator): params[key] = float(text_value)
-                    elif isinstance(widget.validator(), QIntValidator): params[key] = int(text_value)
-                    else: params[key] = text_value 
-                except ValueError: 
-                    params[key] = default # Fallback to default if conversion fails after validation (should be rare)
-                    log.warning(f"Could not convert QLineEdit value for {key} to number. Using default: {default}")
-                    widget.setText(str(default)) # Reset field to default
-            # Handle other widget types if they were in parameter_definitions
+                        break
+                try:
+                    if p_type == "float": params[p_key] = float(text_value)
+                    elif p_type == "int": params[p_key] = int(text_value)
+                except ValueError:
+                    QMessageBox.warning(self, "Input Error", f"Could not convert '{text_value}' to a number for '{p_label}'.")
+                    params[p_key] = p_default 
+                    widget.setFocus()
+                    validation_passed = False
+                    break
+            elif isinstance(widget, QComboBox):
+                params[p_key] = widget.currentText()
+            elif isinstance(widget, QCheckBox):
+                params[p_key] = widget.isChecked()
         
-        # Collect parameters not in the main list (checkboxes, comboboxes)
-        if validation_passed: # Only collect these if basic validation passed
-            for key, widget in self.input_widgets.items():
-                if key not in params: # Avoid re-processing QLineEdits
-                    if isinstance(widget, QComboBox): params[key] = widget.currentText()
-                    elif isinstance(widget, QCheckBox): params[key] = widget.isChecked()
-        
-        if not validation_passed:
-            return None 
-
-        params['generation_timestamp'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        log.info(f"Collected parameters from UI: {params}")
+        if not validation_passed: return None
         return params
 
-    def run_calculations_and_generate_exp(self):
-        self.statusBar().showMessage("Processing... Please wait.")
-        QApplication.processEvents() 
+    def update_results_display(self, skid_res, floor_res, cap_res, wall_res, decal_res, collected_params):
+        def update_cell(key, value):
+            if key in self.results_labels:
+                # Try-except approach for handling deleted widgets
+                try:
+                    # Only proceed if we have a results_table
+                    if not hasattr(self, 'results_table') or self.results_table is None:
+                        return
+                        
+                    # If we can access the widget, it probably still exists
+                    row = self.results_labels[key]
+                    value_item = QTableWidgetItem(value)
+                    font = value_item.font()
+                    font.setBold(True)
+                    font.setPointSize(10)
+                    value_item.setFont(font)
+                    value_item.setForeground(QColor("#000000"))
+                    value_item.setFlags(value_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                    self.results_table.setItem(row, 1, value_item)
+                except (RuntimeError, ReferenceError, AttributeError):
+                    # Widget was deleted or is no longer accessible
+                    return
+        
+        # Skid Results
+        if skid_res and isinstance(skid_res.get('exp_data'), dict):
+            sd = skid_res['exp_data']
+            update_cell('skid_type', f"{skid_res.get('skid_type_nominal', '-')}")
+            update_cell('skid_count', f"{sd.get('CALC_Skid_Count', '-')}")
+            update_cell('skid_spacing', f"{sd.get('CALC_Skid_Pitch', 0.0):.3f} in")
+            update_cell('skid_dims', f"{sd.get('INPUT_Skid_Nominal_Width', 0.0):.2f} x {sd.get('INPUT_Skid_Nominal_Height',0.0):.2f} in")
+            update_cell('skid_length', f"{sd.get('INPUT_Skid_Actual_Length', 0.0):.2f} in")
+        
+        if floor_res and isinstance(floor_res.get('exp_data'), dict):
+            fd = floor_res
+            update_cell('floor_std_type', f"{fd.get('standard_board_nominal_type','-')}")
+            fc = fd.get('std_boards_front_count',0) + fd.get('std_boards_back_count',0)
+            update_cell('floor_std_count', f"{fc}")
+            update_cell('floor_custom_count', f"{fd.get('custom_board_count',0)}")
+            update_cell('floor_custom_width', f"{fd.get('custom_board_actual_width',0):.3f} in")
+            update_cell('floor_gap', f"{fd.get('final_gap_y_remaining',0):.3f} in")
 
-        current_ui_parameters = self.collect_parameters()
-        if current_ui_parameters is None: 
-            self.statusBar().showMessage("Input validation failed. Please correct errors.", 5000)
+        if cap_res and isinstance(cap_res.get('exp_data'), dict) and isinstance(cap_res.get('cap_panel'), dict) \
+           and isinstance(cap_res.get('longitudinal_cleats'), dict) and isinstance(cap_res.get('transverse_cleats'), dict):
+            cp = cap_res['cap_panel']
+            cl = cap_res['longitudinal_cleats']
+            ct = cap_res['transverse_cleats']
+            update_cell('cap_panel_dims', f"{cp.get('length',0):.2f} x {cp.get('width',0):.2f} in")
+            update_cell('cap_long_cleats', f"{cl.get('count',0)} @ {cl.get('actual_spacing_centers',0):.3f} in C-C")
+            update_cell('cap_trans_cleats', f"{ct.get('count',0)} @ {ct.get('actual_spacing_centers',0):.3f} in C-C")
+
+        if wall_res and isinstance(wall_res.get('side_panels'), dict) and isinstance(wall_res.get('end_panels'), dict):
+            wd_s = wall_res['side_panels']
+            wd_e = wall_res['end_panels']
+            update_cell('side_panel_dims', f"{wd_s.get('panel_width_dim',0):.2f} x {wd_s.get('panel_height_dim',0):.2f} in")
+            update_cell('end_panel_dims', f"{wd_e.get('panel_width_dim',0):.2f} x {wd_e.get('panel_height_dim',0):.2f} in")
+        
+        # Update the visualizations
+        if self.visualization_manager:
+            self.visualization_manager.update_visualizations(
+                skid_results=skid_res,
+                floorboard_results=floor_res,
+                wall_results=wall_res,
+                cap_results=cap_res
+            )
+        
+        # Update the specialized visualization views
+        if hasattr(self, 'skid_view') and self.skid_view and skid_res:
+            self.skid_view.set_data(skid_res)
+            
+        if hasattr(self, 'floorboard_view') and self.floorboard_view and floor_res:
+            self.floorboard_view.set_data(floor_res)
+        
+        crate_overall_w = skid_res.get('crate_overall_width_calculated', 0.0) if skid_res else 0.0
+        crate_overall_l = skid_res.get('skid_actual_length', 0.0) if skid_res else 0.0 # Assuming skid length is overall crate length from skid_logic
+        
+        crate_internal_h_for_walls = collected_params.get('product_actual_height',0) + collected_params.get('clearance_above_product',0)
+        crate_overall_h = (skid_res.get('skid_actual_height',0) if skid_res else 0.0) + \
+                          collected_params.get('floor_lumbar_thickness',0) + \
+                          crate_internal_h_for_walls + \
+                          (cap_res.get('cap_panel',{}).get('thickness',0) if cap_res else collected_params.get('panel_thickness',0))
+
+        update_cell('crate_overall_width', f"{crate_overall_w:.2f} in")
+        update_cell('crate_overall_length', f"{crate_overall_l:.2f} in")
+        update_cell('crate_overall_height', f"{crate_overall_h:.2f} in")
+
+    def show_success_dialog(self, message):
+        msg = QMessageBox(self)
+        msg.setIcon(QMessageBox.Icon.Information)
+        msg.setWindowTitle("Success")
+        msg.setText(message)
+        msg.setStyleSheet("QLabel{color:#111;font-size:11pt;} QMessageBox{background:#fff;} QPushButton{background:#007bff;color:#fff;font-weight:bold;padding:6px 18px;border-radius:3px;}")
+        msg.exec()
+
+    def run_calculations_and_generate_exp(self):
+        params = self.collect_parameters()
+        if not params:
+            self.statusBar().showMessage("Parameter validation failed. Please correct inputs.", 5000)
             return
 
-        if not all([config, skid_logic, floorboard_logic]):
-            QMessageBox.critical(self, "Error", "Core logic modules (config, skid, floorboard) not loaded.")
-            self.statusBar().showMessage("Error: Core logic modules missing."); return
-        
-        self.last_skid_results = {} 
-        self.last_floor_results_from_logic = None
-        self.last_floorboard_data_for_exp = {}
-
         try:
-            self.last_skid_results = skid_logic.calculate_skid_layout(
-                product_weight=current_ui_parameters['product_weight'],
-                product_width=current_ui_parameters['product_width'],
-                clearance_side=current_ui_parameters['clearance_side'],
-                panel_thickness=current_ui_parameters['panel_thickness'],
-                cleat_thickness=current_ui_parameters['cleat_thickness'], # Use consolidated cleat_thickness
-                allow_3x4_skids_for_light_loads=current_ui_parameters.get('allow_3x4_skids', True)
+            self.statusBar().showMessage("Running calculations...", 2000)
+            
+            # Calculate shipping base components
+            self.skid_results = skid_logic.calculate_skid_layout(
+                product_weight=params['product_weight'], product_width=params['product_width'],
+                product_length=params['product_length'], clearance_side=params['clearance_side'],
+                panel_thickness=params['panel_thickness'], cleat_thickness=params['cleat_thickness'],
+                allow_3x4_skids_for_light_loads=params['allow_3x4_skids']
             )
-            if not (self.last_skid_results and self.last_skid_results.get('status') == 'OK'):
-                msg = f"Skid calculation failed: {self.last_skid_results.get('message', 'Unknown error')}"
-                QMessageBox.warning(self, "Skid Calculation Warning", msg); log.error(msg)
-                self.last_skid_results = {'status': 'ERROR', 'skid_width': 3.5, 'skid_height': 3.5, 
-                                'max_spacing': 30.0, 'skid_count': 0, 'spacing_actual': 0.0}
-        except TypeError as te:
-             QMessageBox.critical(self, "Skid Logic Error", f"Skid function signature mismatch. Update skid_logic.py? Error: {te}")
-             log.error(f"Skid logic TypeError: {te}", exc_info=True); return
+            skid_results = self.skid_results # Keep local variable for clarity in subsequent calls within this function
+
+            target_span_y_floor = params['product_width'] + 2 * params['clearance_side']
+            board_len_x_floor = skid_results.get('skid_actual_length', params['product_length'])
+
+            floor_results = floorboard_logic.calculate_floorboard_layout_refined(
+                target_span_to_fill_y=target_span_y_floor,
+                board_length_x=board_len_x_floor, 
+                chosen_standard_floorboard_nominal_key=params['chosen_standard_floorboard_nominal'],
+                allow_custom_fill=params['allow_custom_floorboard_fill'],
+                floorboard_actual_thickness_z=params['floor_lumbar_thickness']
+            )
+
+            # Calculate crate cap components
+            crate_internal_h_for_walls = params['product_actual_height'] + params['clearance_above_product']
+            wall_results = wall_logic.calculate_wall_layout(
+                crate_internal_width=target_span_y_floor,
+                crate_internal_length=board_len_x_floor,
+                crate_internal_height=crate_internal_h_for_walls,
+                panel_thickness=params['panel_thickness'],
+                cleat_thickness=params['cleat_thickness'],
+                cleat_width=params['wall_cleat_width'],
+                wall_construction_type="style_b",
+                end_panel_1_removable=params['end_panel_1_removable'],
+                end_panel_2_removable=params['end_panel_2_removable'],
+                side_panel_1_removable=params['side_panel_1_removable'],
+                side_panel_2_removable=params['side_panel_2_removable']
+            )
+            
+            cap_results = cap_logic.calculate_cap_layout(
+                crate_overall_width_y=skid_results.get('crate_overall_width_calculated', 0),
+                crate_overall_length_x=skid_results.get('skid_actual_length', 0),
+                cap_panel_sheathing_thickness=params['panel_thickness'],
+                cap_cleat_actual_thickness=params['cleat_thickness'],
+                cap_cleat_actual_width=params['cap_cleat_width'],
+                max_top_cleat_spacing=params['max_top_cleat_spacing'],
+                top_panel_removable=params['top_panel_removable']
+            )
+
+            # Calculate decals
+            side_panel_h = wall_results.get('side_panels', {}).get('panel_height_dim', 0)
+            side_panel_w = wall_results.get('side_panels', {}).get('panel_width_dim', 0)
+            end_panel_h = wall_results.get('end_panels', {}).get('panel_height_dim', 0)
+            end_panel_w = wall_results.get('end_panels', {}).get('panel_width_dim', 0)
+            overall_crate_h_for_decals = (skid_results.get('skid_actual_height',0)) + \
+                                     params['floor_lumbar_thickness'] + \
+                                     crate_internal_h_for_walls + \
+                                     (cap_results.get('cap_panel',{}).get('thickness', params['panel_thickness']))
+
+            decal_results = decal_logic.calculate_decal_placements(
+                product_is_fragile=params['product_is_fragile'],
+                product_requires_special_handling=params['product_requires_special_handling'],
+                panel_height_side=side_panel_h, panel_width_side=side_panel_w,
+                panel_height_end=end_panel_h, panel_width_end=end_panel_w,
+                overall_crate_height=overall_crate_h_for_decals
+            )
+            
+            # Update visualization widgets with new data
+            # DEBUG: Print info about skid_results
+            print("DEBUG SKID_RESULTS:")
+            print(f"Type: {type(self.skid_results)}")
+            print(f"Has 'exp_data'?: {'exp_data' in self.skid_results if isinstance(self.skid_results, dict) else 'Not a dict'}")
+            if isinstance(self.skid_results, dict) and 'exp_data' in self.skid_results:
+                print(f"exp_data keys: {self.skid_results['exp_data'].keys()}")
+                if 'CALC_Skid_Count' in self.skid_results['exp_data']:
+                    print(f"CALC_Skid_Count: {self.skid_results['exp_data']['CALC_Skid_Count']}")
+            
+            if hasattr(self, 'skid_view') and self.skid_view and self.skid_results:
+                self.skid_view.set_data(self.skid_results)
+            if hasattr(self, 'floorboard_view') and self.floorboard_view and floor_results:
+                # This is where we pass skid_data to the FloorboardTopView
+                print(f"Before set_data, self.skid_results is {self.skid_results is not None}")
+                self.floorboard_view.set_data(floor_results, skid_data=self.skid_results)
+
+            # Update displays (table)
+            self.update_results_display(self.skid_results, floor_results, cap_results, wall_results, decal_results, params)
+
+            # Generate expression file
+            exp_content = exp_generator.generate_nx_exp_file_content(
+                product_params=params, skid_results=self.skid_results, floorboard_results=floor_results,
+                wall_results=wall_results, cap_results=cap_results, decal_results=decal_results,
+                app_version=config.VERSION
+            )
+
+            output_dir = os.path.dirname(self.exp_output_path)
+            if not os.path.exists(output_dir): os.makedirs(output_dir)
+            
+            with open(self.exp_output_path, 'w') as f: f.write(exp_content)
+            
+            self.statusBar().showMessage(f"Successfully generated {os.path.basename(self.exp_output_path)}", 5000)
+            self.show_success_dialog(f"Successfully generated AutoCrate_Expressions.exp to:\n{self.exp_output_path}")
+
         except Exception as e:
-            QMessageBox.critical(self, "Skid Logic Error", f"Skid calculation error: {e}")
-            log.error(f"Skid logic error: {e}", exc_info=True)
-            self.last_skid_results = {'status': 'ERROR', 'skid_width': 3.5, 'skid_height': 3.5, 
-                            'max_spacing': 30.0, 'skid_count': 0, 'spacing_actual': 0.0}
-
-        self.last_floorboard_data_for_exp = {
-            'front_boards': [], 'back_boards': [], 'custom_board': {},
-            'y_offset_for_floorboards': 0.0, 'target_span_to_fill': 0.0,
-            'standard_board_actual_width': 0.0, 'final_gap': 0.0
-        }
-        floor_results_summary_for_exp_header = {}
-
-        if self.last_skid_results.get('status') == 'OK':
-            try:
-                # Use consolidated cleat_thickness for y_offset_abs
-                y_offset_abs = current_ui_parameters['cleat_thickness'] + current_ui_parameters['panel_thickness']
-                span_to_fill = current_ui_parameters['product_length'] + (2 * current_ui_parameters['clearance_side'])
-                
-                skid_count_val = self.last_skid_results.get('skid_count', 0)
-                skid_spacing_val = self.last_skid_results.get('spacing_actual', 0.0)
-                skid_width_val = self.last_skid_results.get('skid_width', 0.0)
-                board_len_x_val = 0.0
-                if skid_count_val == 0: board_len_x_val = 0.0
-                elif skid_count_val == 1: board_len_x_val = skid_width_val
-                else: board_len_x_val = (skid_count_val - 1) * skid_spacing_val + skid_width_val
-                
-                self.last_floor_results_from_logic = floorboard_logic.calculate_floorboard_layout_refined(
-                    target_span_to_fill_y=span_to_fill,
-                    board_length_x=board_len_x_val, 
-                    chosen_standard_nominal=current_ui_parameters['chosen_standard_floorboard_nominal'],
-                    allow_custom_fill=current_ui_parameters['allow_custom_floorboard_fill'],
-                    floorboard_actual_thickness_z=current_ui_parameters['floor_lumbar_thickness']
-                )
-
-                if self.last_floor_results_from_logic and self.last_floor_results_from_logic.get("status") in ["OK", "WARNING"]:
-                    summary = self.last_floor_results_from_logic.get("summary", {})
-                    self.last_floorboard_data_for_exp['y_offset_for_floorboards'] = y_offset_abs
-                    self.last_floorboard_data_for_exp['target_span_to_fill'] = span_to_fill
-                    self.last_floorboard_data_for_exp['standard_board_actual_width'] = summary.get('chosen_standard_actual_width_y', 0.0)
-                    self.last_floorboard_data_for_exp['final_gap'] = summary.get('final_gap_y', 0.0)
-                    
-                    floor_results_summary_for_exp_header = {
-                        'chosen_standard_floorboard_actual_width': summary.get('chosen_standard_actual_width_y', 0.0),
-                        'calculated_standard_floorboard_count': summary.get('total_standard_boards_count', 0),
-                        'calculated_custom_floorboard_width': summary.get('custom_board_actual_width_y',0.0),
-                        'calculated_custom_floorboard_count': summary.get('custom_board_count', 0),
-                        'calculated_final_floor_gap': summary.get('final_gap_y', 0.0)
-                    }
-                    
-                    all_boards = self.last_floor_results_from_logic.get("boards_layout_details", [])
-                    front_list, back_list, custom_dict = [], [], {}
-                    std_processed_count = 0
-                    total_std = summary.get('total_standard_boards_count', 0)
-                    all_boards.sort(key=lambda b: b.get('y_pos_relative_start_edge', 0.0))
-
-                    for board in all_boards:
-                        abs_y = y_offset_abs + board.get('y_pos_relative_start_edge', 0.0)
-                        b_data = {'width': board.get('actual_width_y',0.0), 'y_pos_abs_leading_edge': abs_y}
-                        if board.get('type') == 'custom': custom_dict = b_data
-                        elif board.get('type') == 'standard':
-                            if std_processed_count < total_std / 2.0: front_list.append(b_data)
-                            else: back_list.append(b_data)
-                            std_processed_count += 1
-                    self.last_floorboard_data_for_exp['front_boards'] = front_list
-                    self.last_floorboard_data_for_exp['back_boards'] = back_list
-                    self.last_floorboard_data_for_exp['custom_board'] = custom_dict
-                else:
-                    QMessageBox.warning(self, "Floorboard Logic Warning", 
-                                        f"Floorboard calculation did not return OK/WARNING: {self.last_floor_results_from_logic.get('message', 'Unknown error') if self.last_floor_results_from_logic else 'No result'}")
-            except Exception as e:
-                QMessageBox.critical(self, "Floorboard Logic Error", f"An error occurred during floorboard calculation: {e}")
-                log.error(f"Floorboard logic error: {e}", exc_info=True)
-        
-        current_ui_parameters.update(floor_results_summary_for_exp_header)
-        # Pass the single 'cleat_thickness' to be used for wall_cleat_thickness in .exp generation
-        current_ui_parameters['wall_cleat_thickness_for_exp'] = current_ui_parameters.get('cleat_thickness')
-        current_ui_parameters['cap_cleat_thickness_for_exp'] = current_ui_parameters.get('cleat_thickness')
-
-
-        exp_file_content_str = generate_nx_exp_file_content_for_pyqt(current_ui_parameters, self.last_skid_results, self.last_floorboard_data_for_exp)
-        
-        save_path = self.exp_output_path_edit.text()
-        if not save_path: self.set_default_exp_output_path(); save_path = self.exp_output_path_edit.text()
-
-        try:
-            exp_dir = os.path.dirname(save_path)
-            if exp_dir and not os.path.exists(exp_dir): os.makedirs(exp_dir); log.info(f"Created directory for .exp file: {exp_dir}")
-            with open(save_path, 'w') as f: f.write(exp_file_content_str)
-            success_msg = f".exp file updated successfully at: {save_path}"
-            QMessageBox.information(self, "Success", success_msg)
-            self.statusBar().showMessage(success_msg, 5000); log.info(success_msg)
-        except PermissionError:
-            err_msg = f"Permission denied: Could not write to '{save_path}'."
-            QMessageBox.critical(self, "File Error", err_msg + " Check path/permissions.")
-            self.statusBar().showMessage(err_msg); log.error(err_msg)
-        except Exception as e:
-            err_msg = f"Error updating .exp file at '{save_path}': {e}"
-            QMessageBox.critical(self, "File Error", err_msg)
-            self.statusBar().showMessage(err_msg); log.error(err_msg, exc_info=True)
+            self.statusBar().showMessage(f"Error: {str(e)}", 5000)
+            QMessageBox.critical(self, "Error", f"An error occurred: {str(e)}\nCheck console for more details.")
+            print(f"Error details: {e}", file=sys.stderr) # Print to stderr for console visibility
+            import traceback
+            traceback.print_exc()
 
 def main():
     app = QApplication(sys.argv)
-    app.setStyle("Fusion") 
-    
-    palette = QPalette() 
-    palette.setColor(QPalette.ColorRole.Window, QColor(240,244,248)) 
-    palette.setColor(QPalette.ColorRole.WindowText, QColor(26,37,47)) 
-    palette.setColor(QPalette.ColorRole.Base, QColor(255,255,255))      
-    palette.setColor(QPalette.ColorRole.AlternateBase, QColor(225,232,237)) 
-    palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(255,255,220))
-    palette.setColor(QPalette.ColorRole.ToolTipText, QColor(0,0,0))
-    palette.setColor(QPalette.ColorRole.Text, QColor(26,37,47))       
-    palette.setColor(QPalette.ColorRole.Button, QColor(225,232,237))     
-    palette.setColor(QPalette.ColorRole.ButtonText, QColor(38,50,56)) 
-    palette.setColor(QPalette.ColorRole.BrightText, QColor(255,23,68)) 
-    palette.setColor(QPalette.ColorRole.Link, QColor(0,123,255))
-    palette.setColor(QPalette.ColorRole.Highlight, QColor(100,181,246))  
-    palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255,255,255)) 
-    app.setPalette(palette)
-    
-    default_font = QFont("Segoe UI", 9) 
-    app.setFont(default_font)
-    
     ex = AutoCrateApp()
-    ex.show()
+    ex.showMaximized()
     sys.exit(app.exec())
 
 if __name__ == '__main__':
-    main()
+    # It can be helpful to set up basic logging when running directly for debugging
+    # import logging
+    # logging.basicConfig(level=logging.INFO, 
+    #                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # log = logging.getLogger(__name__) # If you want to use a logger instance
+    main() 

@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Style B Crate: Wall and Cap Construction Logic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" integrity="sha384-wcIxkf4k558fYv3mQP2rlA/YBFYZgM4zcUPzVrtqVERKixMOXY2QLoPsEqhtDEAP" crossorigin="anonymous">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            font-weight: 600;
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+        }
+        h1 { font-size: 2.25rem; }
+        h2 { font-size: 1.875rem; }
+        h3 { font-size: 1.5rem; }
+        h4 { font-size: 1.25rem; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1em;
+            margin-bottom: 1em;
+        }
+        th, td {
+            border: 1px solid #e2e8f0; /* Tailwind gray-300 */
+            padding: 0.75rem;
+            text-align: left;
+        }
+        th {
+            background-color: #f7fafc; /* Tailwind gray-100 */
+        }
+        ul, ol {
+            margin-left: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        li {
+            margin-bottom: 0.25rem;
+        }
+        .latex { /* This class might still be used, but KaTeX will handle the rendering */
+            font-family: "Computer Modern", "Lucida Bright", "Georgia", serif;
+        }
+        /* Add a bit more spacing for sections */
+        .section-spacing {
+            margin-bottom: 2rem;
+        }
+    </style>
+
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js" integrity="sha384-hIoBPJpTUs79PPHSQhpCEtUyPQLK7S0J9MZUABVxP9SRLAEE3YdPThO3r+HwIu7t" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js" integrity="sha384-43gB3Fiu3IrtO2Kx8JnVSqwBIHzIJKpASaE9J2U9fQfllD/GAH5A1Ue5B2rXEVrL" crossorigin="anonymous"
+    onload="renderMathInElement(document.body, {
+        delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false}
+        ],
+        throwOnError: false
+    });"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 p-4 sm:p-6 md:p-8">
+    <div class="max-w-4xl mx-auto bg-white p-6 sm:p-8 md:p-10 rounded-lg shadow-lg">
+
+        <header class="text-center mb-12">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Style B Crate: Wall and Cap Construction and Assembly Logic</h1>
+        </header>
+
+        <section class="section-spacing">
+            <h2 class="text-2xl font-semibold border-b pb-2 mb-4">1. Introduction</h2>
+            <p class="mb-4">This report provides a detailed methodology for the construction of individual wall panels (side, end, and top) and their subsequent assembly into a complete crate cap for a Style B crate. It further details the attachment of this cap to the shipping base and the specific requirements for incorporating removable panels. The logic presented is intended to be sufficiently clear and rule-based for translation into automated code generation for manufacturing processes. A Style B crate is characterized by a two-way entry load-bearing lumber shipping base and a "drop-end style cleated plywood cap," with at least one removable side or end panel.</p>
+        </section>
+
+        <section class="section-spacing">
+            <h2 class="text-2xl font-semibold border-b pb-2 mb-4">2. Individual Panel Construction (Side, End, Top)</h2>
+            <p class="mb-4">The construction of each panel (side, end, or top) for the Style B crate cap involves careful selection and preparation of materials, followed by precise assembly of plywood sheathing and lumber cleats. These steps are foundational to the overall structural integrity and dimensional accuracy of the crate.</p>
+
+            <h3 class="text-xl font-semibold mt-6 mb-3">2.1. Material Specifications</h3>
+            <p class="mb-4">The quality and type of materials used for panels are strictly defined to ensure consistent performance and durability. All materials must be new unless part of an approved recycling program, and no substitutions are permitted without written approval from the relevant packaging engineering department.</p>
+
+            <h4 class="text-lg font-semibold mt-4 mb-2">2.1.1. Plywood Sheathing:</h4>
+            <p class="mb-2">Plywood used for panel sheathing must conform to established industry standards (e.g., Voluntary Product Standard PS1). Key requirements include:</p>
+            <ul class="list-disc pl-5 mb-4">
+                <li><strong>Veneer Grain:</strong> Grain of adjacent layers must be perpendicular. The proportion of wood with grain perpendicular to the panel face grain must be 33% to 70% of total panel thickness.</li>
+                <li><strong>Veneer Species:</strong> Face and back veneers are typically coniferous (softwood) species (Larch, Hemlock, Doug-Fir, True Fir, Spruce, Pine) with a density of $20-63 \text{ lbs/ft}^3$. Core veneers can be similar softwoods or hardwoods ($35-75 \text{ lbs/ft}^3$).</li>
+                <li><strong>Minimum Plies:</strong> Dependent on thickness (e.g., $1/4-3/8$ inch plywood: 3 plies; $1/2$ inch plywood: 4 plies; $3/4$ inch plywood: 5 plies).</li>
+                <li><strong>Grades:</strong> Grades B and higher are prohibited. Grades below D are prohibited. Grade D is limited to the back face. For general use, Exterior Plywood (min. C-C Plugged or C-C) or Exposure 1 Plywood (e.g., Underlayment C-D Plugged, C-D/CDX) are allowed.</li>
+                <li><strong>Sheathing Thickness for Cap Panels:</strong> Cleated plywood panels for the crate cap (sides, ends, top) must be manufactured from a minimum of $1/4$ inch plywood.</li>
+            </ul>
+            <p class="mb-4">The detailed material specifications for plywood ensure a baseline level of strength, stability, and surface quality. Controlling factors such as veneer grain direction and minimum plies directly impacts the panel's resistance to warping and its load-bearing capacity. Prohibiting higher grades (which often prioritize appearance over structural qualities for this application) and very low grades ensures a balance of cost-effectiveness and necessary performance.</p>
+
+            <h4 class="text-lg font-semibold mt-4 mb-2">2.1.2. Lumber for Cleats:</h4>
+            <p class="mb-2">Lumber for cleats must meet specific standards for species, grade, moisture content, treatment, and defect limitations:</p>
+            <ul class="list-disc pl-5 mb-4">
+                <li><strong>Species and Density:</strong> Lumber for non-load-bearing applications like cleating must be coniferous (softwood) species from the Pinaceae family with a lower density range ($20-27 \text{ lbs/ft}^3$), such as spruces, pines, and firs.</li>
+                <li><strong>Grade:</strong> Grade #3 or higher is required.</li>
+                <li><strong>Moisture Content:</strong> Must adhere to relevant standards, typically less than 19%, to prevent strength degradation, dimensional instability, and fastener issues.</li>
+                <li><strong>Phytosanitary Treatment:</strong> Must comply with wood packaging regulations, especially for export, requiring treatment and marking.</li>
+                <li><strong>Defect Limitations:</strong> Strict controls are in place:
+                    <ul class="list-disc pl-5 mt-2">
+                        <li>No bark allowed.</li>
+                        <li>Obvious decay and rot are prohibited.</li>
+                        <li>Knots must not compromise manufacturability or structural strength (e.g., knots at nailing points, large loose knots).</li>
+                        <li>Cavities or holes suggesting insect infestation are prohibited unless hidden.</li>
+                        <li>Compression breaks exceeding $1/3$ board width are prohibited (max two per 8 linear feet).</li>
+                        <li>Splits, checks, and shake are regulated by grade and must not severely compromise strength.</li>
+                        <li>Warp (bow, crook, twist, cup) is regulated by grade and must not interfere with assembly tolerances or performance.</li>
+                        <li>Wane is allowed per grade but must not compromise manufacturability or strength.</li>
+                        <li>Stains: Must be free of decay, mold, or unnatural stains. Blue stain is prohibited for all shipments.</li>
+                    </ul>
+                </li>
+            </ul>
+            <p class="mb-4">These lumber specifications are critical for the functionality of cleats as the structural frame of the panels. The choice of lower density softwoods for cleating is appropriate for non-load-bearing structural framing where workability and sufficient strength are key. Adherence to moisture content and defect limitations directly influences the cleat's strength, fastener holding power, and the overall rigidity and longevity of the panel. Such rigorous material control minimizes variability, leading to more predictable and standardized panel components, which is highly beneficial for automated manufacturing and assembly processes by reducing the need for complex conditional logic to handle material deviations.</p>
+
+            <h4 class="text-lg font-semibold mt-6 mb-2">Table 1: Key Material Specifications Summary for Panel Construction</h4>
+            <div class="overflow-x-auto mb-4">
+                <table class="min-w-full border border-gray-300">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="p-3 border-b">Material Component</th>
+                            <th class="p-3 border-b">Specification</th>
+                            <th class="p-3 border-b">Detail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="p-3 border-b">Plywood Sheathing</td>
+                            <td class="p-3 border-b">Minimum Thickness (Cap Panels)</td>
+                            <td class="p-3 border-b">$1/4$ inch</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 border-b"></td>
+                            <td class="p-3 border-b">Standard</td>
+                            <td class="p-3 border-b">PS1 (or equivalent)</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 border-b"></td>
+                            <td class="p-3 border-b">Grades (Allowed)</td>
+                            <td class="p-3 border-b">Exterior: C-C Plugged, C-C. Exposure 1: Underlayment C-D Plugged, C-D/CDX, etc.</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 border-b">Lumber for Cleats</td>
+                            <td class="p-3 border-b">Species Type</td>
+                            <td class="p-3 border-b">Coniferous (softwood), Pinaceae Family (e.g., spruce, pine, fir)</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 border-b"></td>
+                            <td class="p-3 border-b">Density Range</td>
+                            <td class="p-3 border-b">$20-27 \text{ lbs/ft}^3$ (lower density range)</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 border-b"></td>
+                            <td class="p-3 border-b">Grade</td>
+                            <td class="p-3 border-b">#3 or higher</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 border-b"></td>
+                            <td class="p-3 border-b">Moisture Content</td>
+                            <td class="p-3 border-b">&lt;19%</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 border-b"></td>
+                            <td class="p-3 border-b">Defects</td>
+                            <td class="p-3 border-b">No bark; limited decay/knots; no blue stain; warp/wane within grade and not affecting assembly/strength.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3 class="text-xl font-semibold mt-6 mb-3">2.2. Plywood Sheathing Preparation</h3>
+            <p class="mb-4">If the required panel size exceeds standard plywood sheet dimensions, splicing is permitted under strict guidelines to maintain structural integrity.</p>
+
+            <h4 class="text-lg font-semibold mt-4 mb-2">2.2.1. Splicing Rules and Limitations:</h4>
+            <p class="mb-2">When splicing plywood sheathing for a panel, the following rules apply:</p>
+            <ul class="list-disc pl-5 mb-4">
+                <li>Adjacent plywood edges at a splice must be butted together with a gap no greater than $1/8$ inch.</li>
+                <li>The splice joint must be located over, and secured to, the mid-width of a cleat (an intermediate splice cleat or an edge cleat).</li>
+                <li>If spliced at an edge cleat, this can be at the mid-width of the edge cleat $\pm1/4$ inch. The remaining portion of this edge cleat (not covered by the main sheathing piece) must be filled with plywood of equal thickness to the main sheathing.</li>
+                <li>For panels with a height greater than 96.00 inches, any horizontal splices must be located towards the crate base. This placement considers potential stress distributions in taller panels.</li>
+                <li>The best (highest grade) face of the plywood must be oriented to the exterior of the crate.</li>
+                <li>OSB (Oriented Strand Board) is not permitted for customer shipment crates and only for inbound shipments with prior approval.</li>
+            </ul>
+            <p class="mb-4">The number of allowable splices within a single panel is limited by its dimensions, as detailed in Table 2. These limits prevent excessive jointing that could weaken the panel. The rules for splicing balance material utilization—allowing for the use of available plywood sizes—with the imperative of maintaining panel strength. The requirement for splices to occur over cleats creates a direct geometric dependency: if a splice is needed, a cleat must be positioned at that location, influencing the cleat layout design.</p>
+
+            <h4 class="text-lg font-semibold mt-6 mb-2">Table 2: Panel Plywood Maximum Splice Quantity</h4>
+            <p class="italic mb-2 text-sm text-gray-600">(Excludes splices at the cleat mid-width where a full sheet ends)</p>
+            <div class="overflow-x-auto mb-4">
+                <table class="min-w-full border border-gray-300">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="p-3 border-b">Panel Length</th>
+                            <th class="p-3 border-b">Max Vertical Splices</th>
+                            <th class="p-3 border-b">Panel Height</th>
+                            <th class="p-3 border-b">Max Horizontal Splices</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="p-3 border-b">$\le27.50^{\prime\prime}$</td>
+                            <td class="p-3 border-b">0</td>
+                            <td class="p-3 border-b">$\le27.50^{\prime\prime}$</td>
+                            <td class="p-3 border-b">0</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 border-b">$>27.50 \text{ to } \le51.50^{\prime\prime}$</td>
+                            <td class="p-3 border-b">1</td>
+                            <td class="p-3 border-b">$>27.50 \text{ to } \le51.50^{\prime\prime}$</td>
+                            <td class="p-3 border-b">1</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 border-b">$>51.50 \text{ to } \le99.50^{\prime\prime}$</td>
+                            <td class="p-3 border-b">2</td>
+                            <td class="p-3 border-b">$>51.50 \text{ to } \le99.50^{\prime\prime}$</td>
+                            <td class="p-3 border-b">2</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 border-b">$>99.50 \text{ to } \le147.50^{\prime\prime}$</td>
+                            <td class="p-3 border-b">3</td>
+                            <td class="p-3 border-b">$>99.50^{\prime\prime}$</td>
+                            <td class="p-3 border-b">3</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 border-b">$>147.50 \text{ to } \le195.50^{\prime\prime}$</td>
+                            <td class="p-3 border-b">4</td>
+                            <td class="p-3 border-b"></td>
+                            <td class="p-3 border-b"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3 class="text-xl font-semibold mt-6 mb-3">2.3. Cleat Design and Preparation</h3>
+            <p class="mb-4">Lumber cleats form the structural frame of each panel, providing rigidity and surfaces for fastening.</p>
+
+            <h4 class="text-lg font-semibold mt-4 mb-2">2.3.1. Cleat Sizing based on Panel Dimensions:</h4>
+            <p class="mb-2">The size of the lumber cleats is determined by the overall surface area of the panel they are framing. This ensures that larger panels, which experience greater stresses, are supported by more substantial cleats. Adjacent cleat thicknesses within a single panel must match within $1/16$ inch to ensure a flat and consistent frame.</p>
+
+            <h4 class="text-lg font-semibold mt-6 mb-2">Table 3: Cleat Size vs Panel Size</h4>
+            <div class="overflow-x-auto mb-4">
+                <table class="min-w-full border border-gray-300">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="p-3 border-b">Cleat Size (Nominal Lumber)</th>
+                            <th class="p-3 border-b">Panel Size (Surface Area)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="p-3 border-b">$1\times2$ cleats</td>
+                            <td class="p-3 border-b">$\le4 \text{ ft}^{2}$</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 border-b">$1\times3$ cleats</td>
+                            <td class="p-3 border-b">$\le12 \text{ ft}^{2}$</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 border-b">$1\times4$ cleats</td>
+                            <td class="p-3 border-b">$\le56 \text{ ft}^{2}$</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 border-b">$1\times6$ cleats</td>
+                            <td class="p-3 border-b">$>56 \text{ ft}^{2}$</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="mb-4">Cleating wider than $1 \times 6$, or nominal $2^{\prime\prime}$ thick cleating, must be used if analysis or experience indicates it is necessary to enhance panel rigidity and strength. This provision allows for engineering judgment to override standard sizing for particularly demanding applications, ensuring performance targets are met.</p>
+
+            <h4 class="text-lg font-semibold mt-4 mb-2">2.3.2. Prohibition of Cleat Splicing:</h4>
+            <p class="mb-4">A critical rule for maintaining the structural integrity of the panel frame is that "Cleats must not be spliced". Each cleat must be a single, continuous piece of lumber. This eliminates potential weak points that splices could introduce into the frame members.</p>
+
+            <h4 class="text-lg font-semibold mt-4 mb-2">2.3.3. Intermediate Cleat Requirements (Filler/Splice Cleats):</h4>
+            <p class="mb-2">Intermediate cleats (also known as filler or splice cleats) are added to panels to provide additional support to the sheathing, preventing warping or excessive flexing over large unsupported spans. Their necessity and orientation (vertical or horizontal) are determined by the spacing between the main edge cleats of the panel. The center-to-center (C to C) dimension tolerance for cleat spacing is $\pm1/2$ inch.</p>
+
+            <h4 class="text-lg font-semibold mt-6 mb-2">Table 4: Intermediate Cleat Spacing Requirements</h4>
+            <div class="overflow-x-auto mb-4">
+                <table class="min-w-full border border-gray-300">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="p-3 border-b">Panel Width (Edge Cleat Spacing C to C)</th>
+                            <th class="p-3 border-b">Panel Height (Edge Cleat Spacing C to C)</th>
+                            <th class="p-3 border-b">Intermediate Cleats Required & Orientation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="p-3 border-b">$\le24^{\prime\prime}$</td>
+                            <td class="p-3 border-b">$\le24^{\prime\prime}$</td>
+                            <td class="p-3 border-b">None</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 border-b">$\le24^{\prime\prime}$</td>
+                            <td class="p-3 border-b">$\ge24^{\prime\prime}$</td> <td class="p-3 border-b">Horizontal</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 border-b">$>24^{\prime\prime}$</td>
+                            <td class="p-3 border-b">$\le24^{\prime\prime}$</td>
+                            <td class="p-3 border-b">Vertical</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 border-b">$\ge24^{\prime\prime}$</td> <td class="p-3 border-b">$\ge24^{\prime\prime}$</td> <td class="p-3 border-b">Vertical</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="mb-4">For certain crate styles (e.g., Style A), cleat spacing must be $\le30.00^{\prime\prime}$ C to C. While this specific rule may vary, the general principle of limiting unsupported spans applies to all cleated panels. The design rules for the cleat system follow a clear hierarchy: panel dimensions determine edge cleat size (Table 3), and then the resulting edge cleat spacing dictates the need and orientation for intermediate cleats (Table 4). This structured, rule-based approach is well-suited for algorithmic implementation.</p>
+
+            <h3 class="text-xl font-semibold mt-6 mb-3">2.4. Cleated Panel Assembly</h3>
+            <p class="mb-4">Once the plywood sheathing and lumber cleats are prepared, they are assembled to form the individual panels.</p>
+
+            <h4 class="text-lg font-semibold mt-4 mb-2">2.4.1. Attaching Plywood Sheathing to Cleats:</h4>
+            <p class="mb-2">The plywood sheathing is fastened to the lumber cleat frame using divergent tip staples. This type of staple is specified because its legs spread within the wood, significantly increasing withdrawal resistance and creating a stronger joint.</p>
+            <p class="mb-2">The following stapling parameters must be adhered to:</p>
+            <ul class="list-disc pl-5 mb-4">
+                <li>Staple tips must not protrude from the opposite side of the cleat.</li>
+                <li>Staple length must be sufficient to penetrate the lumber cleat by a minimum of 80% of the cleat's thickness. This ensures adequate embedment for strong holding power.</li>
+                <li>The staple pattern into each cleat must consist of two staples at each end of the cleat, followed by a staggered pattern of staples spaced every $\le 4$ inches along the cleat's length. These staples should be placed $0.50 - 1.00$ inch inward from the cleat edges.</li>
+                <li>The head of each staple must not penetrate the plywood surface by more than 25% of the plywood's thickness. Pneumatic staple gun air pressure must be adjusted accordingly to achieve this, preventing damage to the plywood and ensuring the staple head properly bears on the sheathing.</li>
+            </ul>
+            <p class="mb-4">These precise fastening instructions ensure a strong, consistent bond between the sheathing and the cleat frame. Deviations can lead to weakened panels or safety hazards from protruding staples. The emphasis on details like staple penetration and head depth implies an expectation of skilled assembly or well-calibrated automated equipment.</p>
+
+            <h4 class="text-lg font-semibold mt-4 mb-2">2.4.2. Cleat Orientation and Wane Considerations:</h4>
+            <p class="mb-2">To improve crate appearance and ensure functional mating surfaces, cleats must be assembled so that any wane (bark or lack of wood on an edge or corner) is oriented strategically:</p>
+            <ul class="list-disc pl-5 mb-4">
+                <li>On edge cleats, wane should face down (towards the sheathing) and inward (towards the interior of the panel frame).</li>
+                <li>On intermediate cleats, wane should face downward (towards the sheathing).</li>
+            </ul>
+        </section>
+
+        <section class="section-spacing">
+            <h2 class="text-2xl font-semibold border-b pb-2 mb-4">3. Crate Cap Assembly: Connecting Wall and Top Panels</h2>
+            <p class="mb-4">After individual side, end, and top panels are constructed, they are assembled to form the five-sided crate cap. This assembly process follows specific configuration logic and fastening requirements for Style B crates.</p>
+
+            <h3 class="text-xl font-semibold mt-6 mb-3">3.1. Panel Configuration Logic for Style B Crates</h3>
+            <p class="mb-4">The arrangement of panels and the orientation of their cleats are critical for the structural integrity of the cap. Standard diagrams often illustrate the panel configuration for Style B crates.</p>
+
+            <h4 class="text-lg font-semibold mt-4 mb-2">3.1.1. End Panel and Side Panel Overlap:</h4>
+            <p class="mb-4">For Style B crates, the end panels are overlapped by the side panels. The end panel is defined as the panel with the lesser width. This specific overlap (side panels over end panels) dictates an assembly sequence and contributes to the cap's ability to resist racking forces by ensuring effective load transfer at the corners. Fasteners connecting the panels are typically loaded in shear through the side panel cleats into the end panel cleats.</p>
+
+            <h4 class="text-lg font-semibold mt-4 mb-2">3.1.2. Edge Cleat Orientation:</h4>
+            <p class="mb-2">Consistent edge cleat orientation is essential for providing continuous structural members and reliable nailing surfaces:</p>
+            <ul class="list-disc pl-5 mb-4">
+                <li>Vertical edge cleats on end panels must run the full height of the panel.</li>
+                <li>Horizontal edge cleats on side panels must run the full length of the panel.</li>
+                <li>Edge cleats on top panels that run parallel to the shipping base skids must run the full length of the top panel.</li>
+            </ul>
+
+            <h3 class="text-xl font-semibold mt-6 mb-3">3.2. Fastening Panels Together</h3>
+            <p class="mb-4">The permanently joined sections of the crate cap are nailed together according to precise specifications.</p>
+
+            <h4 class="text-lg font-semibold mt-4 mb-2">3.2.1. Nailing Specifications:</h4>
+            <p class="mb-2">For fixed connections between panels (i.e., not the removable panel interfaces), the following nailing rules apply:</p>
+            <ul class="list-disc pl-5 mb-4">
+                <li>Caps must be nailed together with a minimum of one nail every 4 inches.</li>
+                <li>Nail length must be a minimum of 2.5 times the thickness of the panel member being nailed through (e.g., the cleat of the overlapping panel). This ensures adequate penetration into the receiving cleat.</li>
+                <li>Nails must be galvanized or hardened steel, round head, and of a spiral (screw) shank or ring shank design. These nail types offer significantly higher withdrawal resistance compared to smooth shank nails, which is crucial for maintaining crate integrity under dynamic shipping and handling conditions.</li>
+            </ul>
+            <p class="mb-4">This prescriptive nailing pattern provides a standardized approach for non-removable panel connections, ensuring sufficient fastening density.</p>
+
+            <h4 class="text-lg font-semibold mt-4 mb-2">3.2.2. Ensuring Flush Edges and Corners:</h4>
+            <p class="mb-4">A key workmanship standard is that "adjacent panel edges and corners must be flush with one another with no more than $1/8^{\prime\prime}$ allowable gap". Achieving this flushness and minimizing gaps is vital for a well-formed, structurally sound cap. It ensures proper load distribution across joints and minimizes potential entry points for contaminants. This requirement underscores the importance of dimensional accuracy in the individual panel construction phase.</p>
+
+            <h3 class="text-xl font-semibold mt-6 mb-3">3.3. Top Panel Integration</h3>
+            <p class="mb-4">The top panel completes the five-sided cap structure, and its secure attachment is crucial for overall crate rigidity and protection.</p>
+
+            <h4 class="text-lg font-semibold mt-4 mb-2">3.3.1. Cleat Orientation:</h4>
+            <p class="mb-4">For Style B crates (and all crates except Style D), the "top panel to have cleats facing up". This means the plywood sheathing forms the interior ceiling of the crate cap. As mentioned previously, edge cleats on the top panel that are parallel to the shipping base skids must run the full length of the top panel. This orientation provides a structural lid, and the upward-facing cleats can offer protection to the sheathing or a surface for stacking if permitted.</p>
+
+            <h4 class="text-lg font-semibold mt-4 mb-2">3.3.2. Attachment to Assembled Side and End Walls:</h4>
+            <p class="mb-4">The top panel is attached to the assembled side and end walls using the same general panel connection logic: nailing through its edge cleats into the top edge cleats of the side and end panels, following the nailing specifications outlined in Section 3.2.1 (1 nail every 4 inches, appropriate length and type). Standard diagrams often illustrate the top panel resting on and connecting to the side/end panel cleats. If the top panel were designated as the removable panel for a Style B crate (which is permissible under general guidelines, though side/end is typical for Style B), then the securement methods detailed in Section 5.3 would apply to its attachment.</p>
+        </section>
+
+        <section class="section-spacing">
+            <h2 class="text-2xl font-semibold border-b pb-2 mb-4">4. Crate Cap Attachment to Shipping Base</h2>
+            <p class="mb-4">The fully assembled five-sided crate cap is designed to integrate with the Style B shipping base in a specific manner, ensuring stability and proper load transfer.</p>
+
+            <h3 class="text-xl font-semibold mt-6 mb-3">4.1. Positioning Side Panels</h3>
+            <p class="mb-4">The side walls of the crate cap are designed to rest directly on the shipping base structure. For Style B crates, which feature a load-bearing lumber shipping base, specifications often state that "Side panels must sit on top of bottom panel". In this context, the "bottom panel" refers to the floorboards of the shipping base. This direct contact establishes a clear load path, transferring vertical loads from the cap walls and any potential stacked load (if allowed) through the floorboards to the skids of the shipping base.</p>
+
+            <h3 class="text-xl font-semibold mt-6 mb-3">4.2. Implementing "Drop-End Style" for End Panels</h3>
+            <p class="mb-4">A defining characteristic of the Style B crate is its "drop-end style cleated plywood cap". A "Drop End Panel" is explicitly defined as "A panel which extends to, and is flush with, the bottom of a skid upon cap installation". This is often visually represented in crate specification diagrams.</p>
+            <p class="mb-4">This means the end panels (or at least one, if it's the designated removable panel) extend downwards further than the side panels, reaching to the bottom level of the shipping base skids. This design feature likely facilitates easier product access and removal, especially if an end panel is the removable one, creating a wide opening at the base level. It also provides a more complete closure at the ends of the crate. The interaction of these drop-end panels with shipping base components like rub strips (if skids are $\ge96.00^{\prime\prime}$ long) is also a consideration; outer rub strips can be designed to provide a ledge for the crate cap to rest upon.</p>
+
+            <h3 class="text-xl font-semibold mt-6 mb-3">4.3. Method of Securing the Assembled Cap to the Base</h3>
+            <p class="mb-2">The securement of the Style B crate cap to its shipping base is primarily achieved through the robust fit of its components and the locking action of its removable panel(s), rather than a pervasive nailing of the entire cap perimeter to the base.</p>
+            <p class="mb-2">Key aspects contributing to this securement include:</p>
+            <ul class="list-disc pl-5 mb-4">
+                <li><strong>Gravity and Fit:</strong> The side panels rest on the floorboards of the shipping base. The drop-end panels extend to the bottom of the skids, contributing to the overall alignment and enclosure.</li>
+                <li><strong>Removable Panel System:</strong> The primary mechanism for locking the cap to the base and ensuring its stability is the securement of the removable panel(s). These panels, when fastened using Klimps or lag screws via panel stops and lag frames (detailed in Section 5), effectively unite the cap components and maintain its position relative to the base.</li>
+                <li><strong>Rub Strip Support (if applicable):</strong> For crates with skid lengths $\ge96.00^{\prime\prime}$, rub strips are required. The specification often states that "Outer rub strip width must be a crate panel width wider than the outer skids with the extra width protruding to the outside edge of the skid on which to rest the crate cap". This provides a direct physical ledge supporting the crate cap, enhancing stability.</li>
+            </ul>
+            <p class="mb-4">The overall stability relies on this combination of direct support (side panels on floorboards, cap on rub strip ledges if present) and the structural integrity imparted by the correctly fastened removable panel(s).</p>
+        </section>
+
+        <section class="section-spacing">
+            <h2 class="text-2xl font-semibold border-b pb-2 mb-4">5. Incorporation and Securement of Removable Panels</h2>
+            <p class="mb-4">Style B crates are explicitly defined by the presence of at least one removable panel, which is essential for product access. The design and securement of these panels are governed by specific rules.</p>
+
+            <h3 class="text-xl font-semibold mt-6 mb-3">5.1. Requirement for Removable Access</h3>
+            <p class="mb-4">The core requirement is that "At least one side or end panel is removable allowing for easy product access and removal". This gives flexibility in design, allowing the choice of which panel (or panels) will be removable to be based on product geometry, loading procedures, or other operational needs.</p>
+
+            <h3 class="text-xl font-semibold mt-6 mb-3">5.2. Construction of Panel Stops and Lag Frames</h3>
+            <p class="mb-2">To facilitate the proper function of removable panels, panel stops and lag frames are integral components. These structures frame the opening for the removable panel and provide robust attachment points.</p>
+            <ul class="list-disc pl-5 mb-4">
+                <li><strong>Function:</strong> They are used to accurately position, stop (preventing the panel from being pushed inward), and help secure the removable panel(s).</li>
+                <li><strong>Panel Stops:</strong> Must be constructed from plywood with a minimum thickness of $3/8$ inch and a strip width of at least $2.00$ inches.</li>
+                <li><strong>Lag Frame Members:</strong> Must always be made from $2\times4$ lumber, providing substantial material for lag screw engagement.</li>
+                <li><strong>Coverage:</strong> Panel stops and lag frames must cover the entire perimeter of the crate opening created for the removable panel, <em>except for the bottom edge of this opening on Style B (and Style C) crates</em>. This exception for Style B is significant, suggesting the removable panel's lower edge may interface directly with the shipping base or rely on the side/top securements to maintain its position, particularly in conjunction with the "drop-end" design.</li>
+                <li><strong>Exemption for Small Top Panels:</strong> If a top panel is designated as removable and is $\le30$ inches wide, lag frames or panel stops are not required on that top panel opening. This is a conditional rule that optimizes material and labor for smaller removable top sections.</li>
+            </ul>
+            <p class="mb-4">These components create a well-defined and reinforced interface, ensuring repeatable fitting and secure closure of the removable panel.</p>
+
+            <h3 class="text-xl font-semibold mt-6 mb-3">5.3. Securement Mechanisms for Removable Panels</h3>
+            <p class="mb-4">Once the product is loaded, the removable panel(s) must be securely fastened. The choice of fastener depends on the size of the removable panel, reflecting a scalable strategy to handle varying forces.</p>
+
+            <h4 class="text-lg font-semibold mt-6 mb-2">Table 5: Fastener Schedule for Crate Cap Assembly and Removable Panels</h4>
+            <div class="overflow-x-auto mb-4">
+                <table class="min-w-full border border-gray-300">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="p-3 border-b">Connection Type</th>
+                            <th class="p-3 border-b">Fastener Type & Specifications</th>
+                            <th class="p-3 border-b">Spacing / Application Rules</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="p-3 border-b"><strong>Fixed Panel-to-Panel Connections</strong></td>
+                            <td class="p-3 border-b">Galvanized/hardened steel nails (round head, spiral/ring shank)</td>
+                            <td class="p-3 border-b">Min. 1 nail every 4 inches. Nail length min. 2.5x thickness of member nailed through.</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 border-b"><strong>Removable Panel Securement:</strong></td>
+                            <td class="p-3 border-b"></td>
+                            <td class="p-3 border-b"></td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 border-b indent-4">Panel Area $\le 64 \text{ ft}^{2}$</td>
+                            <td class="p-3 border-b">Klimp Fasteners (reusable spring type)</td>
+                            <td class="p-3 border-b">Spaced $18-24^{\prime\prime}$ on center.</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 border-b indent-4">Panel Area $> 64 \text{ ft}^{2}$</td>
+                            <td class="p-3 border-b">Lag Screws ($3/8^{\prime\prime} \times 3.00^{\prime\prime}$)</td>
+                            <td class="p-3 border-b">Spaced $18-24^{\prime\prime}$ on center. Lead hole (full length of screw) must be drilled prior to installation.</td>
+                        </tr>
+                        <tr>
+                            <td class="p-3 border-b indent-4">Combination</td>
+                            <td class="p-3 border-b">Klimps and Lag Screws</td>
+                            <td class="p-3 border-b">Can be used in combination. Spacing for each type remains $18-24^{\prime\prime}$ on center.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="mb-4">The use of Klimps for smaller panels offers quicker, potentially tool-less access, while lag screws provide a more robust, tool-required closure for larger panels. The requirement for lead holes when using lag screws is critical to prevent the $2\times4$ lag frame lumber from splitting, thereby maintaining the integrity of the attachment point. This dual system provides flexibility, balancing ease of access with secure closure based on panel size.</p>
+        </section>
+
+        <section class="section-spacing">
+            <h2 class="text-2xl font-semibold border-b pb-2 mb-4">6. Summary of Logical Flow for Algorithmic Implementation</h2>
+            <p class="mb-4">The construction and assembly of a Style B crate's walls and cap can be broken down into a sequence of rule-based operations, suitable for algorithmic definition:</p>
+            <ol class="list-decimal pl-5 mb-4">
+                <li class="mb-3">
+                    <strong>Initialization & Input:</strong>
+                    <ul class="list-disc pl-5 mt-1">
+                        <li>Receive overall required crate dimensions (Length, Width, Height).</li>
+                        <li>Identify which panel(s) are designated as removable (e.g., one end panel, one side panel).</li>
+                    </ul>
+                </li>
+                <li class="mb-3">
+                    <strong>Individual Panel Design and Construction Loop (Iterate for each of the 5 cap panels):</strong>
+                    <ul class="list-alpha pl-5 mt-1">
+                        <li><strong>a. Calculate Panel Dimensions:</strong> Based on overall crate dimensions and Style B overlap logic (side panels overlap end panels).</li>
+                        <li><strong>b. Calculate Panel Surface Area.</strong></li>
+                        <li><strong>c. Select Cleat Size:</strong> Use Panel Surface Area and Table 3 to determine nominal cleat lumber dimensions (e.g., $1\times4$). Verify adjacent cleat thickness matching.</li>
+                        <li><strong>d. Determine Intermediate Cleat Requirements:</strong> Using panel width/height (edge cleat C-C spacing) and Table 4, determine if horizontal or vertical intermediate cleats are needed, and their quantity based on maintaining acceptable unsupported spans.</li>
+                        <li><strong>e. Plan Plywood Sheathing Layout:</strong>
+                            <ul class="list-disc pl-5 mt-1">
+                                <li>Determine if splicing is necessary based on panel dimensions and available plywood sheet sizes.</li>
+                                <li>If splicing, apply rules from Section 2.2.1: max number of splices from Table 2, splice over cleat mid-width, max $1/8^{\prime\prime}$ gap, placement of horizontal splices for tall panels. Ensure an intermediate cleat is planned at each splice location.</li>
+                            </ul>
+                        </li>
+                        <li><strong>f. Specify Cleat Preparation:</strong> Ensure cleats are single, unspliced pieces. Orient wane according to Section 2.4.2.</li>
+                        <li><strong>g. Specify Panel Assembly (Sheathing to Cleats):</strong>
+                            <ul class="list-disc pl-5 mt-1">
+                                <li>Define staple type (divergent tip).</li>
+                                <li>Define staple length (min. 80% penetration of cleat thickness).</li>
+                                <li>Define staple pattern (2 at ends, staggered every $\le4^{\prime\prime}$, $0.50-1.00^{\prime\prime}$ from edge).</li>
+                                <li>Define staple head penetration (max 25% of plywood thickness).</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+                <li class="mb-3">
+                    <strong>Crate Cap Assembly Logic (Connecting the 5 panels):</strong>
+                    <ul class="list-alpha pl-5 mt-1">
+                        <li><strong>a. Apply Style B Panel Configuration:</strong> End panels are overlapped by side panels. Ensure vertical edge cleats on end panels run full height, and horizontal edge cleats on side panels run full length. Top panel edge cleats parallel to skids run full length.</li>
+                        <li><strong>b. Specify Fastening for Fixed Connections:</strong> For all non-removable panel-to-panel joints, specify nailing: min. 1 nail every 4 inches, nail length min. 2.5x thickness of member nailed through, correct nail type (Table 5).</li>
+                        <li><strong>c. Top Panel Integration:</strong> Ensure top panel cleats face upwards. Fasten to side/end panel top cleats as per fixed connection rules (unless top is designated removable).</li>
+                        <li><strong>d. Verify Assembly Tolerances:</strong> Ensure adjacent panel edges/corners are flush (max $1/8^{\prime\prime}$ gap).</li>
+                    </ul>
+                </li>
+                <li class="mb-3">
+                    <strong>Removable Panel Interface Logic (Apply to designated removable panel(s)):</strong>
+                    <ul class="list-alpha pl-5 mt-1">
+                        <li><strong>a. Design Panel Stops:</strong> Specify $ \ge3/8^{\prime\prime}$ plywood, $\ge2.00^{\prime\prime}$ width, around the opening perimeter (except bottom for Style B).</li>
+                        <li><strong>b. Design Lag Frames:</strong> Specify $2\times4$ lumber for lag frames around the opening perimeter (except bottom for Style B).</li>
+                        <li><strong>c. Check Top Panel Exemption:</strong> If the removable panel is a top panel and $\le30^{\prime\prime}$ wide, panel stops/lag frames on the top panel opening are not required.</li>
+                        <li><strong>d. Select Securement Mechanism (Table 5):</strong>
+                            <ul class="list-disc pl-5 mt-1">
+                                <li>Calculate area of the removable panel.</li>
+                                <li>If area $\le 64 \text{ ft}^{2}$, specify Klimp fasteners.</li>
+                                <li>If area $> 64 \text{ ft}^{2}$, specify $3/8^{\prime\prime} \times 3.00^{\prime\prime}$ lag screws.</li>
+                                <li>Combination is allowed.</li>
+                            </ul>
+                        </li>
+                        <li><strong>e. Specify Fastener Spacing:</strong> $18-24^{\prime\prime}$ on center for Klimps and/or lag screws.</li>
+                        <li><strong>f. Specify Lead Holes (if lag screws used):</strong> Drilled full length of the screw.</li>
+                    </ul>
+                </li>
+                <li class="mb-3">
+                    <strong>Crate Cap to Shipping Base Integration Logic:</strong>
+                    <ul class="list-alpha pl-5 mt-1">
+                        <li><strong>a. Position Side Panels:</strong> Ensure side panels of the assembled cap sit on top of the shipping base floorboards.</li>
+                        <li><strong>b. Implement Drop-End Panels:</strong> Ensure designated end panels extend to be flush with the bottom of the shipping base skids.</li>
+                        <li><strong>c. Check for Rub Strip Support:</strong> If shipping base skids are $\ge96.00^{\prime\prime}$, rub strips will be present. The cap should rest on the protruding ledge of these outer rub strips.</li>
+                        <li><strong>d. Final Securement:</strong> Achieved by fastening the removable panel(s) as per step 4, locking the cap structure relative to the base.</li>
+                    </ul>
+                </li>
+            </ol>
+            <p class="mb-4">This logical flow, with its conditional steps and references to specific parameters and tables, provides a framework for developing an automated system for generating Style B crate designs or manufacturing instructions. The modularity of the rules allows for individual components (panels, interfaces) to be designed and then integrated into the overall crate assembly.</p>
+        </section>
+
+        <section>
+            <h2 class="text-2xl font-semibold border-b pb-2 mb-4">7. Conclusion</h2>
+            <p class="mb-4">The construction and assembly of walls and the cap for a Style B crate are governed by a detailed set of material specifications, dimensional rules, and procedural guidelines. Key elements include the use of cleated plywood panels, with specific requirements for cleat sizing, plywood splicing, and sheathing attachment. The assembly of these panels into a five-sided cap follows a defined configuration for Style B crates, notably where side panels overlap end panels, and the cap features a "drop-end" design where end panels extend to the base of the skids.</p>
+            <p class="mb-4">A critical aspect of Style B crate design is the mandatory inclusion of at least one removable side or end panel, facilitated by panel stops and lag frames, and secured by Klimps or lag screws depending on panel size. The assembled cap integrates with the shipping base by having its side panels rest on the floorboards and potentially on ledges provided by rub strips, with the drop-end panels ensuring full enclosure at the ends.</p>
+            <p class="mb-4">The highly prescriptive nature of these rules—covering material selection, defect allowances, fastening patterns, and dimensional tolerances—minimizes ambiguity and promotes consistency. This detailed, rule-based framework is well-suited for translation into algorithms for automated design or manufacturing systems, ensuring that crates are produced to a reliable and verifiable standard. Adherence to these specifications is essential for achieving the intended structural performance, product protection, and operational functionality of Style B crates.</p>
+        </section>
+
+        <footer class="mt-12 pt-6 border-t text-center text-sm text-gray-500">
+            <p>&copy; Style B Crate Specification Document Conversion. For informational purposes.</p>
+        </footer>
+    </div>
+    </body>
+</html>

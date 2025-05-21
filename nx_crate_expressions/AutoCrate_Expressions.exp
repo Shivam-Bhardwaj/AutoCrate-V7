@@ -1,0 +1,50 @@
+// NX Expressions for AutoCrate Wizard - Skids, Floorboards & Cap Assembly
+// Parameters from PyQt GUI at: 2025-05-21 02:49:17
+// AutoCrate Wizard Version: 0.6.0
+
+// =============================
+// 1. USER CONTROLS (Values from UI)
+// =============================
+[lbm]product_weight = 600.0  // Product Weight
+[Inch]product_width = 38.000     // Product Width - across skids
+[Inch]product_length = 46.000    // Product Length - along skids
+[Inch]product_actual_height = 91.500 // Product Actual Height
+[Inch]clearance_side = 1.000     // Clearance per Side
+[Inch]clearance_above_product = 1.500 // Clearance above product
+[Inch]panel_thickness = 0.250   // Panel Sheathing Thickness
+[Inch]cleat_thickness = 0.750   // General Cleat Actual Thickness
+[Inch]wall_cleat_width = 3.500 // Wall Cleat Actual Width
+[Inch]floor_lumbar_thickness = 1.500 // Floorboard Actual Thickness
+[Inch]cap_cleat_width = 3.500     // Cap Cleat Actual Width
+[Inch]max_cap_cleat_spacing_rule = 24.000 // Max rule for cap cleats
+
+// ===========================================
+// 2. CALCULATED CRATE AND USABLE DIMENSIONS (NX Expressions)
+// ===========================================
+[Inch]crate_width_OD = ... // TODO: Add calculation
+[Inch]crate_length_OD = ... // TODO: Add calculation
+[Inch]skid_usable_width_ID = ... // TODO: Add calculation
+
+// =============================
+// 3. SKID LAYOUT (Values from Python skid_logic, for NX Pattern)
+// =============================
+[Inch]INPUT_Skid_Nominal_Width = 3.500
+[Inch]INPUT_Skid_Nominal_Height = 3.500
+CALC_Skid_Count = 3
+[Inch]CALC_Skid_Pitch = 18.2500
+[Inch]CALC_First_Skid_Pos_X = -18.2500
+[Inch]INPUT_Skid_Actual_Length = 50.000
+
+// ===========================================
+// 4. FLOORBOARD PARAMETERS (for N-Instance Suppression Strategy)
+// ===========================================
+[Inch]INPUT_Floorboard_Actual_Thickness = 1.500
+
+// ===========================================
+// 5. CAP ASSEMBLY PARAMETERS (for N-Instance Suppression Strategy)
+// ===========================================
+[Inch]CAP_Panel_Width = ... // TODO: Add calculation
+[Inch]CAP_Panel_Length = ... // TODO: Add calculation
+[Inch]CAP_Panel_Thickness = 0.250
+
+// End of AutoCrate Wizard Expressions
