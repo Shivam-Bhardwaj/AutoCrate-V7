@@ -1,0 +1,23 @@
+{
+    "product_weight": 1800.0,
+    "product_width": 75.0,
+    "product_length": 110.0,
+    "product_actual_height": 55.0,
+    "clearance_side": 2.5,
+    "clearance_above_product": 2.0,
+    "panel_thickness": 0.75,
+    "wall_cleat_thickness": 0.75,
+    "wall_cleat_width": 3.5,
+    "floor_lumbar_thickness": 1.5,
+    "chosen_standard_floorboard_nominal": "2x8",
+    "allow_custom_floorboard_fill": true,
+    "cap_cleat_thickness": 0.75,
+    "cap_cleat_width": 3.5,
+    "max_top_cleat_spacing": 24.0,
+    "generation_timestamp": "2025-05-14 16:26:37",
+    "chosen_standard_floorboard_actual_width": 7.25,
+    "calculated_standard_floorboard_count": 14,
+    "calculated_custom_floorboard_width": 13.5,
+    "calculated_custom_floorboard_count": 1,
+    "calculated_final_floor_gap": 0.0
+}
