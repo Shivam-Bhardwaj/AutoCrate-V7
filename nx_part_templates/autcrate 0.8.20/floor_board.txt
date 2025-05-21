@@ -1,0 +1,13 @@
+add component FB_2
+
+height = 
+
+INPUT_Skid_Nominal_Height/ touch for now
+
+FB_Std_Back_2_Y_Pos_Abs + (FB_Std_Back_2_Actual_Width / 2)
+
+suppression: 
+
+1 - FB_Std_Back_2_Suppress_Flag
+
+

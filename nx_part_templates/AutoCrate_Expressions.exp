@@ -1,12 +1,13 @@
 // NX Expressions for AutoCrate Wizard - Skids & Floorboards (N-Instance Strategy)
-// Parameters based on UI state at: 2025-05-15 03:03:45
+// Parameters from PyQt GUI at: 2025-05-20 18:12:57
+// Allow 3x4 Skids for Light Loads Option: Enabled
 
 // =============================
 // 1. USER CONTROLS (Values from UI)
 // =============================
 [lbm]product_weight = 1800.0  // Product Weight
 [Inch]product_width = 75.00     // Product Width - across skids
-[Inch]product_length = 110.00    // Product Length - along skids
+[Inch]product_length = 121.00    // Product Length - along skids
 [Inch]product_actual_height = 55.00 // Product Actual Height (for content)
 [Inch]clearance_side = 2.50     // Clearance per Side (product to inner wall face)
 [Inch]clearance_above_product = 2.00 // Clearance above product
@@ -21,7 +22,7 @@
 
 // --- Constants (Informational) ---
 [Inch]min_skid_height_const = 3.5
-[Inch]float_tolerance_const = 0.001
+[Inch]float_tolerance_const = 0.000001
 
 // ===========================================
 // 2. CALCULATED CRATE AND USABLE DIMENSIONS (NX Expressions)
@@ -45,15 +46,15 @@ CALC_Skid_Count = 4
 // ===========================================
 // 4. FLOORBOARD PARAMETERS (for N-Instance Suppression Strategy)
 // ===========================================
-[Inch]CALC_Floor_Start_Y_Offset_Abs = 1.500 // Abs Y for first front board's leading edge
-[Inch]CALC_Floor_Target_Layout_Span = 115.000 // Total Y-span floorboards must cover
-[Inch]CALC_Floor_Board_Length_Across_Skids = CALC_Overall_Skid_Span // X-Length of each floorboard piece
+[Inch]CALC_Floor_Start_Y_Offset_Abs = 1.500
+[Inch]CALC_Floor_Target_Layout_Span = 126.000
+[Inch]CALC_Floor_Board_Length_Across_Skids = CALC_Overall_Skid_Span
 [Inch]INPUT_Floorboard_Actual_Thickness = floor_lumbar_thickness
 [Inch]CHOSEN_Std_Floorboard_Actual_Width_Val = 7.250
-// INFO_Std_Floorboard_Count_Python = 14
-// INFO_Custom_Floorboard_Count_Python = 1
-// INFO_Custom_Floorboard_Width_Python = 13.500 [Inch]
-// INFO_Final_Floor_Gap_Python = 0.0000 [Inch]
+// INFO_Python_Std_Floorboard_Count = 16
+// INFO_Python_Custom_Floorboard_Count = 1
+// INFO_Python_Custom_Floorboard_Width = 10.000 [Inch]
+// INFO_Python_Final_Floor_Gap = 0.0000 [Inch]
 
 // --- Front Standard Floorboards (Max 10 slots) ---
 FB_Std_Front_1_Suppress_Flag = 0
@@ -77,9 +78,9 @@ FB_Std_Front_6_Suppress_Flag = 0
 FB_Std_Front_7_Suppress_Flag = 0
 [Inch]FB_Std_Front_7_Actual_Width = 7.250
 [Inch]FB_Std_Front_7_Y_Pos_Abs = 45.000 // Leading Edge Y
-FB_Std_Front_8_Suppress_Flag = 1
-[Inch]FB_Std_Front_8_Actual_Width = 0.000
-[Inch]FB_Std_Front_8_Y_Pos_Abs = 0.000 // Leading Edge Y
+FB_Std_Front_8_Suppress_Flag = 0
+[Inch]FB_Std_Front_8_Actual_Width = 7.250
+[Inch]FB_Std_Front_8_Y_Pos_Abs = 52.250 // Leading Edge Y
 FB_Std_Front_9_Suppress_Flag = 1
 [Inch]FB_Std_Front_9_Actual_Width = 0.000
 [Inch]FB_Std_Front_9_Y_Pos_Abs = 0.000 // Leading Edge Y
@@ -90,28 +91,28 @@ FB_Std_Front_10_Suppress_Flag = 1
 // --- Back Standard Floorboards (Max 10 slots) ---
 FB_Std_Back_1_Suppress_Flag = 0
 [Inch]FB_Std_Back_1_Actual_Width = 7.250
-[Inch]FB_Std_Back_1_Y_Pos_Abs = 65.750 // Leading Edge Y
+[Inch]FB_Std_Back_1_Y_Pos_Abs = 69.500 // Leading Edge Y
 FB_Std_Back_2_Suppress_Flag = 0
 [Inch]FB_Std_Back_2_Actual_Width = 7.250
-[Inch]FB_Std_Back_2_Y_Pos_Abs = 73.000 // Leading Edge Y
+[Inch]FB_Std_Back_2_Y_Pos_Abs = 76.750 // Leading Edge Y
 FB_Std_Back_3_Suppress_Flag = 0
 [Inch]FB_Std_Back_3_Actual_Width = 7.250
-[Inch]FB_Std_Back_3_Y_Pos_Abs = 80.250 // Leading Edge Y
+[Inch]FB_Std_Back_3_Y_Pos_Abs = 84.000 // Leading Edge Y
 FB_Std_Back_4_Suppress_Flag = 0
 [Inch]FB_Std_Back_4_Actual_Width = 7.250
-[Inch]FB_Std_Back_4_Y_Pos_Abs = 87.500 // Leading Edge Y
+[Inch]FB_Std_Back_4_Y_Pos_Abs = 91.250 // Leading Edge Y
 FB_Std_Back_5_Suppress_Flag = 0
 [Inch]FB_Std_Back_5_Actual_Width = 7.250
-[Inch]FB_Std_Back_5_Y_Pos_Abs = 94.750 // Leading Edge Y
+[Inch]FB_Std_Back_5_Y_Pos_Abs = 98.500 // Leading Edge Y
 FB_Std_Back_6_Suppress_Flag = 0
 [Inch]FB_Std_Back_6_Actual_Width = 7.250
-[Inch]FB_Std_Back_6_Y_Pos_Abs = 102.000 // Leading Edge Y
+[Inch]FB_Std_Back_6_Y_Pos_Abs = 105.750 // Leading Edge Y
 FB_Std_Back_7_Suppress_Flag = 0
 [Inch]FB_Std_Back_7_Actual_Width = 7.250
-[Inch]FB_Std_Back_7_Y_Pos_Abs = 109.250 // Leading Edge Y
-FB_Std_Back_8_Suppress_Flag = 1
-[Inch]FB_Std_Back_8_Actual_Width = 0.000
-[Inch]FB_Std_Back_8_Y_Pos_Abs = 0.000 // Leading Edge Y
+[Inch]FB_Std_Back_7_Y_Pos_Abs = 113.000 // Leading Edge Y
+FB_Std_Back_8_Suppress_Flag = 0
+[Inch]FB_Std_Back_8_Actual_Width = 7.250
+[Inch]FB_Std_Back_8_Y_Pos_Abs = 120.250 // Leading Edge Y
 FB_Std_Back_9_Suppress_Flag = 1
 [Inch]FB_Std_Back_9_Actual_Width = 0.000
 [Inch]FB_Std_Back_9_Y_Pos_Abs = 0.000 // Leading Edge Y
@@ -121,8 +122,8 @@ FB_Std_Back_10_Suppress_Flag = 1
 
 // --- Custom Middle Floorboard (1 slot) ---
 FB_Custom_Suppress_Flag = 0
-[Inch]FB_Custom_Actual_Width = 13.500
-[Inch]FB_Custom_Y_Pos_Abs = 52.250 // Leading Edge Y
+[Inch]FB_Custom_Actual_Width = 10.000
+[Inch]FB_Custom_Y_Pos_Abs = 59.500 // Leading Edge Y
 [Inch]CALC_Floor_Final_Gap_Debug = 0.0000 // For verification (Python calc)
 
 // End of AutoCrate Wizard Expressions
